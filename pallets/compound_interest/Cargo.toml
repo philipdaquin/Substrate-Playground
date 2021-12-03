@@ -1,5 +1,5 @@
 [package]
-name = 'pallet-template'
+name = 'pallet-compound_interest'
 version = '4.0.0-dev'
 description = 'FRAME pallet template for defining custom runtime logic.'
 authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
@@ -54,11 +54,17 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
-[dev-dependencies.sp-runtime]
+[dependencies.sp-runtime]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
+
+[dependencies]
+sp-std = { version = '3.0', default-features = false }
+sp-arithmetic = { version = '3.0', default-features = false }
+substrate-fixed = { git = 'https://github.com/encointer/substrate-fixed.git', branch = "master" }
+
 
 [features]
 default = ['std']
@@ -69,5 +75,7 @@ std = [
     'frame-support/std',
     'frame-system/std',
     'frame-benchmarking/std',
+    'sp-std/std',
+    'sp-arithmetic/std',
 ]
 try-runtime = ['frame-support/try-runtime']
