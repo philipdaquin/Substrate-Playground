@@ -1,21 +1,4 @@
-#![cfg_attr(not(feature = "std"), no_std)]
-//	A pallet that demonstrates the fundamentals of Fixed Point Arithmetic 
-//	This pallet implements 3 Multiplicative accumulators using fixed point 
-
-//	1. Manual Implementation -
-//	2. PerMill Implmentation - ie. Saturating Mul
-//	3. Substrate-fixed Implementation - trancendental functions 
-pub use pallet::*;
-#[cfg(test)]
-mod mock;
-#[cfg(test)]
-mod tests;
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
-
-#[frame_support::pallet]
-pub mod pallet {
-	use super::*;
+//use super::*;
 	use frame_support::{dispatch::DispatchResult, pallet_prelude::*};	
 	use frame_system::pallet_prelude::*;
 	use sp_arithmetic::{traits::Saturating, Permill};
@@ -48,16 +31,9 @@ pub mod pallet {
 	}
 	#[pallet::storage]
 	#[pallet::getter(fn fixed_value)]
-	pub(super) type FixedAccumulator<T: Config> =nStorageValue<_, U16F16, ValueQuery, FixedAccumulatorDefaultValue<T>>;
+	pub(super) type FixedAccumulator<T: Config> = StorageValue<_, U16F16, ValueQuery, FixedAccumulatorDefaultValue<T>>;
 
 	//* Manual Implementation */
-	#[pallet::type_value]
-	pub fn ManualAccumulatorDefaultValue<T: Config>() -> u32 { 
-		1 << 16
-	}
-	#[pallet::storage]
-	#[pallet::getter(fn manual_value)]
-	pub(super) type ManualAccumulator<T: Config> = StorageValue<_, u32, ValueQuery, ManualAccumulatorDefaultValue>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -102,42 +78,11 @@ pub mod pallet {
 			new_factor: U16F16
 		) -> DispatchResultWithPostInfo { 
 			ensure_signed(origin)?;
-			let old_accumulated = Self::fixed_value();
-			let new_value = old_accumulated.checked_add(&new_factor).ok_or(Error::<T>::StorageOverflow)?;
-			FixedAccumulator::<T>::put(new_value);
-			Self::deposit_event(Event::FixedUpdated(new_factor, new_value));
+			
+
 
 
 			Ok(().into())
 		}
-		#[pallet::weight(10_000)]
-		pub fn update_manual(
-			origin: OriginFor<T>,
-			new_factor: u32
-		) -> DispatchResultWithPostInfo { 
-			ensure_signed(origin)?;
-			//	To ensure we dont overflow unncessarily, the values are cast up to u64 before multiplyigng 
-			//	This intermediate format has 48 integer positions and 16 fractional
-			let old_accumulated: u64 = Self::manual_value() as u64;
-			let new_factor_u64: u64 = new_factor as u64;
 
-			//	Perform the multiplication on the u64 values 
-			let raw_product: u64 = old_accumulated * new_factor_u64;
-
-			//	Right shift to restore the convention that 15 bits are fractional
-			let shifted_product: u64 = raw_product >> 16;
-
-			//	Ensure that the product fits inu32, and effort if it doesn t
-			if shifted_product > (u32::max_value() as u64) { 
-				return Err(Error::<T>::StorageOverflow.into())
-			}
-			
-			let final_product = shifted_product as u32;
-			ManualAccumulator::<T>::put(final_product);
-			Self::deposit_event(Event::ManualUpdated(new_factor, final_product));
-			
-
-			Ok(().into())
-		}
 	}
-}

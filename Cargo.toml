@@ -3,7 +3,8 @@ members = [
     'node',
     #'pallets/template',
     'runtime',
-    'pallets/compound_interest',
+   # 'pallets/compound_interest',
+  # 'pallets/Fixed_points',
 ]
 [profile.release]
 panic = 'unwind'
