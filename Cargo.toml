@@ -5,6 +5,7 @@ members = [
     'runtime',
    # 'pallets/compound_interest',
   # 'pallets/Fixed_points',
+  'pallets/Marketplace'
 ]
 [profile.release]
 panic = 'unwind'
