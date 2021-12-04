@@ -24,7 +24,7 @@ use sp_runtime::{ArithmeticError, DispatchError};
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::UnixTime, Blake2_128Concat};
+	use frame_support::{dispatch::{DispatchResult}, pallet_prelude::*, traits::UnixTime, Blake2_128Concat};
 	use frame_system::pallet_prelude::*;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
@@ -46,14 +46,14 @@ pub mod pallet {
 	pub type MemberScore<T> = StorageMap<
 		_,
 		Blake2_128Concat, 
-		T::AccountId, 
+		AccountId<T>, 
 		(Reputation_Score, u32), 
 		ValueQuery
 		>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn members)]
-	pub type Members<T> = StorageValue<_, Vec<T::AccountId>, ValueQuery>;
+	pub type Members<T> = StorageValue<_, Vec<AccountId<T>>, ValueQuery>;
 
 
 	#[pallet::event]
@@ -63,6 +63,12 @@ pub mod pallet {
 			rater: T::AccountId, 
 			owner: T::AccountId, 
 		},
+		AddedMember { 
+			new_member: T::AccountId, 
+		},
+		RemovedMember { 
+			member: T::AccountId, 
+		}
 	}
 
 	// Errors inform users that something went wrong.
@@ -79,8 +85,26 @@ pub mod pallet {
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		//	Add remove members 
-		//	Remove Members 
+		#[pallet::weight(10_000)]
+		pub fn add_member(
+			origin: OriginFor<T>,
+			new_member: T::AccountId
+		) -> DispatchResult { 
+			ensure_signed(origin)?;
+
+
+			Ok(())
+		}
+		
+		#[pallet::weight(10_000)]
+		pub fn remove_member(
+			origin: OriginFor<T>,
+			curr_member: T::AccountId
+		) -> DispatchResult { 
+			ensure_signed(origin)?;
+
+			Ok(())
+		}
 	} 
 	impl<T: Config> Pallet<T> { 
 
@@ -98,7 +122,7 @@ pub trait Reputation<AccountId, Moment> {
 		review: Self::Feedback, 
 		now: Moment
 
-	) -> Result<(), Error<()>>;
+	) -> Result<u32, DispatchError> ;
 	//	Assigns a rating to another person 
 	fn rate_buyer(
 		buyer: AccountId,
@@ -106,7 +130,7 @@ pub trait Reputation<AccountId, Moment> {
 		review: Self::Feedback,
 		now: Moment
 
-	) -> Result<(), Error<()>>;
+	) -> Result<u32, DispatchError> ;
 	//	The current ratings of an account 
 	fn reputation(sender: AccountId) -> Self::Reputation_Score;
 }
@@ -142,35 +166,33 @@ impl<T: Config> Reputation<T::AccountId, T::Moment> for Pallet<T> {
 		seller: T::AccountId, 
 		review: Feedback,
 		now: T::Moment
-	) -> Result<(), Error<()>> { 
-
+	) -> Result<u32, DispatchError> { 
 		let rating = review.rating();
 		//	Insert in Rating in to seller's account and then update an the average  
 		let members = Self::members();
 		match !members.contains(&seller) { 
 			true => return Err(Error::<T>::NotFoundSeller.into()),
 			false => { 
-				MemberScore::<T>::mutate(&seller, |(score, count)| -> Result<i32, DispatchError> { 
+				MemberScore::<T>::mutate(&seller, |(score, count)| -> Result<(u32, u32), DispatchError> { 
 					let curr = *score;
-					let count = *count;
+					let cccount = *count;
 					//	Get the average and insert into storage 
 					*score = score.checked_add(rating).ok_or(ArithmeticError::Overflow)?;
 					*count = count.checked_add(1).ok_or(ArithmeticError::Overflow)?;
-					*score = score.checked_div(count).ok_or(ArithmeticError::DivisionByZero)?;
+					*score = score.checked_div(*count).ok_or(ArithmeticError::DivisionByZero)?;
 					
-					Ok(curr)
-				})
+					Ok((curr, cccount))
+				});
 			}
 		}
-
-		Ok(())
+		Ok(rating)
 	}
 	fn rate_buyer(
 		buyer: T::AccountId, 
 		seller: T::AccountId, 
 		review: Feedback,
 		now: T::Moment
-	) -> Result<(), Error<()>> { 
+	) -> Result<u32, DispatchError>  { 
 
 		let rating = review.rating();
 		//	Insert in Rating in to seller's account and then update an the average  
@@ -178,25 +200,24 @@ impl<T: Config> Reputation<T::AccountId, T::Moment> for Pallet<T> {
 		match !members.contains(&buyer) { 
 			true => return Err(Error::<T>::NotFoundBuyer.into()),
 			false => { 
-				MemberScore::<T>::mutate(&buyer, |(score, count)| -> Result<i32, DispatchError> { 
+				MemberScore::<T>::mutate(&buyer, |(score, count)| -> Result<(u32, u32), DispatchError> { 
 					let curr = *score;
-					let count = *count;
+					let cccount = *count;
 					//	Get the average and insert into storage 
 					*score = score.checked_add(rating).ok_or(ArithmeticError::Overflow)?;
 					*count = count.checked_add(1).ok_or(ArithmeticError::Overflow)?;
-					*score = score.checked_div(count).ok_or(ArithmeticError::DivisionByZero)?;
+					*score = score.checked_div(*count).ok_or(ArithmeticError::DivisionByZero)?;
 					
-					Ok(curr)
-				})
+					Ok((curr, cccount))
+				});
 			}
 		}
-
-		Ok(())
+		Ok(rating)
 	}
 	fn reputation(sender: T::AccountId) -> Self::Reputation_Score {
 		let members = Self::members();
-		ensure!(members.contain(&sender), Error::<T>::NotFound);
-		let score = MemberScore::<T>::try_get(&sender);
+		
+		let score = MemberScore::<T>::get(&sender);
 		//	return the average score 
 		score.0
 	}
