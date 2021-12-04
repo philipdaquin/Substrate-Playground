@@ -48,7 +48,7 @@ pub mod pallet {
 	}
 	#[pallet::storage]
 	#[pallet::getter(fn fixed_value)]
-	pub(super) type FixedAccumulator<T: Config> =nStorageValue<_, U16F16, ValueQuery, FixedAccumulatorDefaultValue<T>>;
+	pub(super) type FixedAccumulator<T: Config> =StorageValue<_, U16F16, ValueQuery, FixedAccumulatorDefaultValue<T>>;
 
 	//* Manual Implementation */
 	#[pallet::type_value]
