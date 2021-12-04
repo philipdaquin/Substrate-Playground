@@ -76,7 +76,9 @@ pub mod pallet {
 	pub enum Error<T> {
 		NotFoundSeller,
 		NotFound,
-		NotFoundBuyer
+		NotFoundBuyer,
+		NotMember, 
+		AlreadyMember
 
 	}
 
@@ -90,19 +92,33 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			new_member: T::AccountId
 		) -> DispatchResult { 
-			ensure_signed(origin)?;
-
+			let new_member = ensure_signed(origin)?;
+			let mut member_list = Members::<T>::get();
+			
+			let location = member_list.binary_search(&new_member).err().ok_or(Error::<T>::AlreadyMember)?;
+			member_list.insert(location, new_member.clone());
+			Members::<T>::put(&member_list);
+			Self::deposit_event(Event::AddedMember { 
+				new_member
+			});
 
 			Ok(())
 		}
-		
 		#[pallet::weight(10_000)]
 		pub fn remove_member(
 			origin: OriginFor<T>,
 			curr_member: T::AccountId
 		) -> DispatchResult { 
-			ensure_signed(origin)?;
+			let curr_member = ensure_signed(origin)?;
 
+			let mut member_list = Members::<T>::get();
+			let location = member_list.binary_search(&curr_member).ok().ok_or(Error::<T>::NotFound)?;
+			member_list.remove(location);
+			Members::<T>::put(&member_list);
+			
+			Self::deposit_event(Event::RemovedMember { 
+				member: curr_member
+			});
 			Ok(())
 		}
 	} 
