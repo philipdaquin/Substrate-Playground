@@ -30,6 +30,8 @@ use substrate_fixed::types::*;
 
 mod types;
 use crate::types::*;
+mod functions;
+use crate::functions::*;
 
 //* Subscription Model based Payment System: */
 //	- Connect and Role based system -> Allow users to rate the merchants 
@@ -225,19 +227,34 @@ use super::*;
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
+		//	Triggered when Users are trying to generate duplicate id of another existign id
 		PaymentPlanAlreadyExist,
+		//	Triggered when Users are trying to call functions on a Non Existing Id
 		PaymentPlanDoesNotExist,
+		//	The singing account 
 		InsufficientBalance,
+		//	Unpriviledge call
 		UnAuthorisedCall,
+		//	Invalud metadata given 
 		BadMetadata,
+		//	Storage Error
 		Unknown,
+		//	The Payment plan in Frozen 
 		Frozen,
+		//	user trying to freeze an already frozen payment 
 		AlreadyUnFrozen,
+		//	User trying to execute payments on non existing users
 		UserDoesNotExist,
+		//	Users trying to execute payments on non subscribed users 
 		NotASubscriber,
+		//	Zero subscribers 
 		NoSubscribersFound,
+		
 		UserNotSubscribed,
-		NotDueYet
+		//	Users trying to execute calls on non due days
+		NotDueYet,
+		//	Payment required cant be set to zero 
+		MinCannotBeZero
 
 	}
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -261,7 +278,7 @@ use super::*;
 				true => { 
 					let bounded_name: BoundedVec<u8, T::StringLimit> =
 					name.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
-					
+					ensure!(!required_payment.is_zero(), Error::<T>::MinCannotBeZero);
 					let deposit = T::SubmissionDeposit::get();
 					
 					let new_payment = Self::new_payment_plan()
@@ -696,7 +713,6 @@ use super::*;
 			#[pallet::compact] required_payment: T::Balance,
 			#[pallet::compact] freezer: <T::Lookup as StaticLookup>::Source,
 			#[pallet::compact] set_frozen: bool,
-
 		) -> DispatchResult { 
 			T::ForceOrigin::ensure_signed(origin)?;	
 			let owner = T::Lookup::lookup(origin)?;
@@ -914,15 +930,13 @@ use super::*;
 					ensure!(subscription_info.1.next_payment == now, Error::<T>::NotDueYet);
 					//	Get users that are subscribed into this payment plan 
 					
-					let force_call = pallet_proxy::Pallet::proxy(admin, subscriber, Default::default(), 
 					//	Force call the user to transfer funds into the child trie
-						T::Currency::transfer(
-							&subscriber, 
-							&Self::fund_account_id(payment_id),
-							subscription_info.required_payment,
-							ExistenceRequirement::AllowDeath
-						)?
-					);
+					let force_call = T::Currency::force_transfer(
+						admin,
+						&subscriber, 
+						&Self::fund_account_id(payment_id),
+						subscription_info.required_payment,)?;
+				
 					//	If force payment call fails, force_cancel user subscription 
 					if force_call.is_err() { 
 						//	Revoke user Priviledges
@@ -937,81 +951,5 @@ use super::*;
 
 			Ok(().into())
 		}
-	} 
-	impl<T: Config> Pallet<T> { 
-		//	Does the id already exist in our storage? 
-		fn verify_new_plan(id: &PaymentIndex) -> bool { 
-			PaymentInfo::<T>::contains_key(id)
-		}
-		//	Create a new payment plan using PaymentPlanBuilder
-		fn new_payment_plan() -> PaymentPlanBuilder<T::AccountId, T::Balance> { 
-			PaymentPlanBuilder::<T::AccountId, T::Balance>::default()
-		}
-		//	Create subscription to a Payment Plan 
-		fn new_subscription() -> SubscriptionBuilder<T::AccountId, T::Moment, T::Balance> { 
-			SubscriptionBuilder::<T::AccountId, T::Moment, T::Balance>::default()
-		}
-		//	This is where recurring payments are paid into 
-		fn fund_account_id(idx: PaymentIndex) -> T::AccountId { 
-			T::PalletId::get().into_sub_account(idx)
-		}
-		//	Track Payment Index
-		fn next_payment_id() -> Result<u32, DispatchError> {
-			PaymentId::<T>::try_mutate(|index| -> Result<u32, DispatchError> {
-				let current_id = *index;
-				*index = index.checked_add(1).ok_or(ArithmeticError::Overflow)?;
-				Ok(current_id)
-			})
-		}
-		fn next_subscriber_id() -> Result<u32, DispatchError> { 
-			SubscriptionId::<T>::try_mutate(|id| -> Result<u32, DispatchError> { 
-				let curr = *id;
-				*id = id.checked_add(1).ok_or(ArithmeticError::Overflow)?;
-				Ok(curr)
-			})
-		}
-		// 	Function to find the id associated with the fund id (child trie)
-		//	Each fund stores information about it ***contributors and their ***contributions in a child trie 
-		
-		//	This helper function calculates the id of the associate child trie 
-		fn id_from_index(
-			index: PaymentIndex
-		) -> child::ChildInfo { 
-			let mut buf = Vec::new();
-			buf.extend_from_slice(b"payment");
-			buf.extend_from_slice(&index.to_le_bytes()[..]);
-
-			child::ChildInfo::new_default(T::Hashing::hash(&buf[..]).as_ref())
-		}
-		//	Put Payment under a key: user account 
-		fn insert_payment(
-			index: PaymentIndex, 
-			who: &T::AccountId, 
-			balance: &T::Balance
-		) {
-			let id = Self::id_from_index(index);
-			who.using_encoded(|b| child::put(&id, b, &balance));
-		}
-		//	Get the value paid by the user 
-		fn get_payment_info(
-			index: PaymentIndex, 
-			who: &T::AccountId
-		) -> BalanceOf<T> {
-			let id = Self::id_from_index(index);
-			who.using_encoded(|b| child::get_or_default::<BalanceOf<T>>(&id, b))
-		}
-		fn kill_paymentsystem(index: PaymentIndex) {
-			let id = Self::id_from_index(index);
-			// The None here means we aren't setting a limit to how many keys to delete.
-			// Limiting can be useful, but is beyond the scope of this recipe. For more info, see
-			// https://crates.parity.io/frame_support/storage/child/fn.kill_storage.html
-			child::kill_storage(&id, None);
-		}
-	}
-	impl<T: Config> PaymentInfo<T> { 
-
-	}
-	impl<T: Config> Subscriptions<T> { 
-		
-	}
+	} 	
 }
