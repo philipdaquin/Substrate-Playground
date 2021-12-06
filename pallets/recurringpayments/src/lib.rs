@@ -810,13 +810,87 @@ use super::*;
 
 			Ok(().into())
 		}
+		///	Remove User from the Subscription List 
+		/// Refund user for any unspent subscription period 
+		/// Remove proxy from user to prevent scheduled dispatchables 
+		/// Destroy User Subscription 
+		#[pallet::weight(10_000)]
+		pub fn force_cancel_subscription(
+			origin: OriginFor<T>,
+			#[pallet::compact] payment_id: PaymentIndex,
+			subscriber: <T as StaticLookup>::Source
+		) -> DispatchResult { 
+			T::ForceOrigin::ensure_signed(origin)?;
+			let subscriber = T::Lookup::lookup(subscriber)?;
+
+			match !Self::verify_new_plan(&payment_id) {
+				true => {
+					return Err(Error::<T>::PaymentPlanDoesNotExist)
+				},
+				_ => {
+					let subscription_info = Subscriptions::<T>::get(&subscriber).ok_or(Error::<T>::Unknown)?;
+					let mut info = subscription_info.1;
+					ensure!(!info.subscribed_to.is_empty(), Error::<T>::UserNotSubscribed);
+					ensure!(!info.subscribed_to.contains(&payment_id), Error::<T>::UserNotSubscribed);
+					
+					//	Calculate the amount of refund given to user for unspent period 
+					if info.required_payment != Zero::zero()  { 
+						//	Get the users payment for this CURRENT PERIOD, not the entire paymentsm, ensure merchants are collecting 
+						//	User payments on a periodic schedule
+						let balance = Self::get_payment_info(payment_id, &subscriber);						
+					 
+						let begin_period = info.start;
+						let payment_due = info.frequency_of.frequency();
+						let difference =  payment_due - I32F32::from_num(info.start);
+						let ratio = I32F32::from_num(difference)/payment_due;
+						
+						//	How much the user get to keep 
+						let new_ratio = I32F32::from_num(1) - ratio;
+						
+						//	If the ratio is not 1, then we can refund all unused period 
+						if new_ratio != I32F32::from_num(1) { 
+							//	Refund on current subscription period, ensure the collection has their scheduled date dispatchable function 
+							//	The line below is: 
+							//	Refunded amount = CurrentPeriodBalance(1 - Ratio between the starting date and due payment date)
+							//	ie RefundedToUser = 100(1 - 0.5 <-- or 50% before finishing the period) => refund 50 to user
+							let user_refund = balance.saturating_mul(new_ratio);
+							
+							// Return funds to caller without charging a transfer fee
+							let _ = T::Currency::resolve_into_existing(&subscriber, 
+								T::Currency::withdraw(
+								&Self::fund_account_id(payment_id), 
+									user_refund, 
+									WithdrawReasons::TRANSFER, 
+									ExistenceRequirement::AllowDeath
+								)?
+							);
+							Self::deposit_event(Event::PaymentRefundedToUser { 
+								user: subscriber,
+								id: payment_id, 
+								now: T::Moment::now()
+							});
+						}
+					} 
+					pallet_proxy::Pallet::<T>::remove_proxies(&subscriber);
+					//	Delete subscription info 
+					Subscriptions::<T>::remove(&subscriber);
+					Self::deposit_event(Event::RecurringPaymentCancelled { 
+						user: subscriber,
+						id: payment_id,
+						now: T::Moment::now(),
+					});
+				}
+			}
+			Ok(())
+		}
+
 		#[pallet::weight(10_000)]
 		pub fn force_payment(
 			origin: OriginFor<T>,
 			subscriber: <T as StaticLookup>::Source,
 			#[pallet::compact] payment_id: PaymentIndex,
 		) -> DispatchResultWithPostInfo { 
-			T::ForceOrigin::ensure_signed(origin)?;
+			let admin = T::ForceOrigin::ensure_signed(origin)?;
 			let subscriber = T::Lookup::lookup(subscriber)?;
 
 			match !Self::verify_new_plan(&payment_id) { 
@@ -839,8 +913,25 @@ use super::*;
 					//	Check if the user is meant to pay now 
 					ensure!(subscription_info.1.next_payment == now, Error::<T>::NotDueYet);
 					//	Get users that are subscribed into this payment plan 
-					//	Check if the next payment is due now
-					//	Get the required payment 
+					
+					let force_call = pallet_proxy::Pallet::proxy(admin, subscriber, Default::default(), 
+					//	Force call the user to transfer funds into the child trie
+						T::Currency::transfer(
+							&subscriber, 
+							&Self::fund_account_id(payment_id),
+							subscription_info.required_payment,
+							ExistenceRequirement::AllowDeath
+						)?
+					);
+					//	If force payment call fails, force_cancel user subscription 
+					if force_call.is_err() { 
+						//	Revoke user Priviledges
+						Self::force_cancel_subscription(
+							admin, 					
+							payment_id,
+							subscriber
+						)?;
+					}
 				},
 			}
 
