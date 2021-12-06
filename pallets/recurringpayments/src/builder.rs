@@ -30,7 +30,10 @@ pub struct PaymentPlanBuilder<AccountId, Balance>
 	payment_id: PaymentIndex,
 	required_payment: Balance,
 	total_deposits: Balance,
-	frequency: Frequency
+	frequency: Frequency,
+	num_subscribers: u32,
+	freezer: AccountId,
+	is_frozen: bool
 
 }
 //	Set up default values for payment plans -> Set to default values 
@@ -44,7 +47,10 @@ impl<AccountId, Balance> Default for PaymentPlanBuilder<AccountId, Balance>
 			payment_id: PaymentIndex::default(),
 			required_payment: Zero::zero(),
 			total_deposits: Zero::zero(),
-			frequency: Frequency::None
+			frequency: Frequency::None,
+			num_subscribers: Zero::zero(),
+			freezer: AccountId::default(),
+			is_frozen: false,
 		}
 	}
 }
@@ -76,6 +82,19 @@ impl<AccountId, Balance> PaymentPlanBuilder<AccountId, Balance>
 		self.frequency = frequency;
 		self
 	}
+	pub fn total_subscribers(mut self, num_subscribers: u32) -> Self { 
+		self.num_subscribers = num_subscribers;
+		self
+	}
+	pub fn freezer(mut self, freezer: AccountId) -> Self { 
+		self.freezer = freezer;
+		self
+	}
+	pub fn freeze_payments(mut self, is_frozen: bool) -> Self { 
+		self.is_frozen = is_frozen;
+		self
+	}
+
 	pub fn build(self) -> PaymentPlan<AccountId, Balance> { 
 		PaymentPlan::<AccountId, Balance> { 
 			merchant: self.merchant,
@@ -83,20 +102,27 @@ impl<AccountId, Balance> PaymentPlanBuilder<AccountId, Balance>
 			payment_id: self.payment_id,
 			required_payment: self.required_payment,
 			total_deposits: self.total_deposits,
-			frequency: self.frequency
+			frequency: self.frequency,
+			num_subscribers: self.num_subscribers,
+			freezer: self.freezer,
+			is_frozen: self.is_frozen
 		}
 	}
 }
 #[derive(Default)]
-pub struct SubscriptionBuilder<AccountId, Moment> 
-	where AccountId: Default, Moment: Default
+pub struct SubscriptionBuilder<AccountId, Moment, Balance> 
+	where AccountId: Default, Moment: Default, Balance: Default
 {
 	owner: AccountId,
 	start: Moment, 
 	next_payment: Moment, 
-	frequency_of: Frequency
+	required_payment: Balance,
+	frequency_of: Frequency,
+	num_frequency: u32,
+	subscribed_to: Vec<u8>,
+	
 }
-impl<AccountId, Moment> SubscriptionBuilder<AccountId, Moment> 
+impl<AccountId, Moment, Balance> SubscriptionBuilder<AccountId, Moment, Balance> 
 	where AccountId: Default, Moment: Default
 { 
 	pub fn account_id(mut self, owner: AccountId) -> Self { 
@@ -115,12 +141,27 @@ impl<AccountId, Moment> SubscriptionBuilder<AccountId, Moment>
 		self.frequency_of = frequency_of;
 		self
 	}
-	pub fn build(self) -> Subscription<AccountId, Moment> { 
-		Subscription::<AccountId, Moment> { 
+	pub fn set_num_freq(mut self, num_frequency: Option<u32>) -> Self { 
+		self.num_frequency = num_frequency;
+		self
+	}
+	pub fn min_payments(mut self, required_payment: Balance) -> Self { 
+		self.required_payment = required_payment;
+		self
+	}
+	pub fn subscribed_list(mut self, subscribed_to: Vec<u8>) -> Self { 
+		self.subscribed_to = subscribed_to;
+		self
+	}
+	pub fn build(self) -> Subscription<AccountId, Moment, Balance> { 
+		Subscription::<AccountId, Moment, Balance> { 
 			owner: self.owner,
 			start: self.start,
 			next_payment: self.next_payment,
-			frequency_of: self.frequency_of
+			required_payment: self.required_payment,
+			frequency_of: self.frequency_of,
+			num_frequency: self.num_frequency,
+			subscribed_to: self.subscribed_to,
 		}
 	}
 }
