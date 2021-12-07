@@ -78,6 +78,7 @@ pub struct PaymentPlan<AccountId, Balance> {
 	pub is_frozen: bool,  
 	//	> Number of subscribers currently 
 	pub schedule_periodic_collection: Frequency,
+	
 
 }
 //	This will help us track the user's next payment 

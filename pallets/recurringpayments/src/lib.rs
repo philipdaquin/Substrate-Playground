@@ -222,7 +222,19 @@ use super::*;
 			who: T::AccountId, 
 			id: PaymentIndex,
 			now: T::Moment
-		}
+		},
+		RefundedUsers { 
+			sender: T::AccountId,
+			id: PaymentIndex,
+			now: T::Moment, 
+		},
+		PartiallyRefunded { 
+			sender: T::AccountId,
+			id: PaymentIndex, 
+			now: T::Moment,
+		},
+
+
 
 	}
 
@@ -270,7 +282,7 @@ use super::*;
 			// 	.payment_frequency(frequency)
 			// 	.total_subscribers(Zero::zero())
 			// 	.freezer(merchant)
-			// 	.freeze_payments(false)
+			// 	.freeze_payments(false) 
 			// 	.build();
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
@@ -281,7 +293,8 @@ use super::*;
 			#[pallet::compact] user_frequency: Frequency,
 			#[pallet::compact] name: Vec<u8>,
 			#[pallet::compact] freezer: Option<T::AccountId>,
-			#[pallet::compact] schedule_periodic_collection: Frequency
+			#[pallet::compact] schedule_periodic_collection: Frequency,
+			#[pallet::compact] collection_portion: Option<Portion>,
 		) -> DispatchResult { 
 			let merchant = ensure_signed(origin)?;
 			//	ensure merchants can only create payment plans
@@ -295,6 +308,7 @@ use super::*;
 				merchant.clone(), 
 				freezer,
 				schedule_periodic_collection,
+				collection_portion,
 				T::SubmissionDeposit::get(),
 				Event::PaymentPlanCreated { 
 					merchant,
@@ -371,50 +385,21 @@ use super::*;
 		pub fn collect_payments(
 			origin: OriginFor<T>,
 			#[pallet::compact] payment_id: PaymentIndex,
-			#[pallet::compact] specified_portion: Portion, // later to be implemented using Substrate Fixed
-			#[pallet::compact] delete_payment_plan_forever: bool,
+			#[pallet::compact] specified_portion: Option<Portion>, // later to be implemented using Substrate Fixed
 			#[pallet::compact] schedule_periodic_collection: Frequency
 		) -> DispatchResult { 
 			let merchant = ensure_signed(origin)?;
 			
-			match !Self::verify_new_plan(&payment_id) { 
-				true =>	{ 
-					return Err(Error::<T>::PaymentPlanDoesNotExist);
-				},
-				_ => { 
-					let payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
-					ensure!(merchant == payment_info.merchant, Error::<T>::UnAuthorisedCall);
-					ensure!(!payment_info.total_deposits == Zero::zero(), Error::<T>::InsufficientBalance);
-					//	Ensure we are not chargin fees when the user decides to collect their payments
-					let _ = T::Currency::resolve_creating( 
-						&payment_info.merchant, T::Currency::withdraw(
-							&Self::fund_account_id(payment_id),
-							payment_info.total_deposits,
-							WithdrawReasons::TRANSFER,
-							ExistenceRequirement::AllowDeath,
-						)?
-					);
-					//	Ensure the user is verified and perform double confirmation 
-					if delete_payment_plan_forever { 
-						PaymentInfo::<T>::remove(payment_id);
-						Self::kill_paymentsystem(payment_id);
-						Self::deposit_event(Event::PaymentPlanKilled { 
-							merchant,
-							id: payment_id, 
-							now: T::Moment::now()
-						});	
-					} else { 
-						Self::deposit_event(Event::PaymentCollected { 
-							merchant,
-							id: payment_id,
-							now: T::Moment::now()
-						});
-					}
-					//	Schedule dispatchable for Frequency of Collection
-
-				}
-			}
-			Ok(())
+			Self::do_collect_payments(
+				merchant,
+				payment_id, 
+				specified_portion,
+				Self::deposit_event(Event::PaymentCollected { 
+					merchant,
+					id: payment_id,
+					now: T::Moment::now()
+				})
+			)
 		}
 		///	Cancel User Subscriber
 		/// To ensure fair service, we will refund a portion of the user's unspent period of their subscription
@@ -427,63 +412,20 @@ use super::*;
 		) -> DispatchResultWithPostInfo { 
 			let subscriber = ensure_signed(origin)?;
 			
-			match !Self::verify_new_plan(&payment_id) { 
-				true => { 
-					return Err(Error::<T>::PaymentPlanDoesNotExist);
+			Self::do_cancel(
+				subscriber,
+				payment_id,
+				Event::PaymentRefundedToUser { 
+					user: subscriber,
+					id: payment_id, 
+					now: T::Moment::now()
 				},
-				_ => { 
-					//	Get the users contribution 
-					let balance = Self::get_payment_info(payment_id, &subscriber);
-					let subscriber_info = Subscriptions::<T>::get(&subscriber).ok_or(Error::<T>::Unknown)?;
-					
-					//	Get User's Subscription information 
-					let subscription = subscriber_info.1;
-					
-					let begin_period = subscription.start;
-					let payment_due = subscription.frequency_of.frequency();
-					let difference =  payment_due - I32F32::from_num(subscription.start);
-					let ratio = I32F32::from_num(difference)/payment_due;
-					
-					//	How much the user get to keep 
-					let new_ratio = I32F32::from_num(1) - ratio;
-					
-					//	If the ratio is not 1, then we can refund all unused period 
-					if new_ratio != I32F32::from_num(1) { 
-						//	Refund on current subscription period, ensure the collection has their scheduled date dispatchable function 
-						//	The line below is: 
-						//	Refunded amount = CurrentPeriodBalance(1 - Ratio between the starting date and due payment date)
-						//	ie RefundedToUser = 100(1 - 0.5 <-- or 50% before finishing the period) => refund 50 to user
-						let user_refund = balance.saturating_mul(new_ratio);
-						
-						// Return funds to caller without charging a transfer fee
-						let _ = T::Currency::resolve_into_existing(&subscriber, 
-							T::Currency::withdraw(
-							&Self::fund_account_id(payment_id), 
-								user_refund, 
-								WithdrawReasons::TRANSFER, 
-								ExistenceRequirement::AllowDeath
-							)?
-						);
-						Self::deposit_event(Event::PaymentRefundedToUser { 
-							user: subscriber,
-							id: payment_id, 
-							now: T::Moment::now()
-						});
-					}
-					//	Remove Proxy inside the user 
-					pallet_proxy::Pallet::<T>::remove_proxies(&subscriber);
-					//	Remove schedule dispatchable
-					let payment_info = PaymentInfo::<T>::get(payment_id);
-					pallet_scheduler::Pallet::<T>::cancel_named(payment_info.name);
+				Event::RecurringPaymentCancelled { 
+					user: subscriber,
+					id: payment_id,
+					now: T::Moment::now(),
 				}
-			}
-			Self::deposit_event(Event::RecurringPaymentCancelled { 
-				user: subscriber,
-				id: payment_id,
-				now: T::Moment::now(),
-			});
-
-			Ok(().into())
+			)
 		}
 		//	ensure the user can edit this while subscribers do not lose their positions 
 		// 	if editing, unreserve the funds inside the trie into the depositor immediately but do not destroy the fund 
@@ -496,44 +438,26 @@ use super::*;
 			#[pallet::compact] name_s: Vec<u8>,
 			#[pallet::compact] freezer: <T as StaticLookup>::Source,
 			#[pallet::compact] schedule_periodic_collection: Frequency,
+			#[pallet::compact] collection_portion: Option<Portion>,
 		) -> DispatchResultWithPostInfo { 
 			let seller = ensure_signed(origin)?;
 			let freezer = T::Lookup::lookup(freezer);
-			match !Self::verify_new_plan(&id) { 
-				true => {
-					return Err(Error::<T>::PaymentPlanDoesNotExist); 
-				},
-				_ => {
-					//	Access Payment Plan Details 
-					let payment_info = PaymentInfo::<T>::get(id).ok_or(Error::<T>::Unknown)?;
-					ensure!(payment_info.merchant == seller, Error::<T>::UnAuthorisedCall);
-
-					let new_name: BoundedVec<u8, T::StringLimit> =
-						name_s.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
-
-					PaymentInfo::<T>::insert(
-						id,
-						PaymentPlan { 
-							merchant: payment_info.merchant,
-							name: new_name,
-							payment_id: payment_info.payment_id,
-							required_payment: new_payment,
-							total_deposits: payment_info.total_deposits,
-							frequency,
-							num_subscribers: payment_info.num_subscribers,
-							freezer,
-							is_frozen: payment_info.is_frozen,
-							schedule_periodic_collection
-						}
-					);
-					Self::deposit_event(Event::EditedPaymentPlan { 
-						merchant: seller, 
-						id, 
-						now: T::Moment::now()
-					});
-				}
-			}
-			Ok(().into())
+			
+			Self::do_edit_plan(
+				id, 
+				name_s,
+				new_payment,
+				frequency,
+				seller,
+				freezer,
+				schedule_periodic_collection,
+				collection_portion,
+				Self::deposit_event(Event::EditedPaymentPlan { 
+					merchant: seller, 
+					id, 
+					now: T::Moment::now()
+				},)
+			)			
 		}
 		//	If merchant is present, or not, refund the remaining balances to the merchant owner found 
 		//	inside the struct 
@@ -546,45 +470,16 @@ use super::*;
 				Ok(_) => None, 
 				Err(origin) => Some(ensure_signed(origin)?),
 			};
-			match !Self::verify_new_plan(&payment_id) { 
-				true => {
-					return Err(Error::<T>::PaymentPlanDoesNotExist); 
-				},
-				_ => {
-					let payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
-					//	Check if the Some(Merchant) is the Owner
-					if let Some(check_owner) = maybe_owner { 
-						ensure!(payment_info.merchant == check_owner, Error::<T>::UnAuthorisedCall);
-					}
-					//	If total deposit is not zero, return to user 
-					if !payment_info.total_deposits == Zero::zero() {
-						//	Ensure we are not charging fees when the user decides to collect their payments
-						let _ = T::Currency::resolve_creating( 
-							&payment_info.merchant, T::Currency::withdraw(
-								&Self::fund_account_id(payment_id),
-								payment_info.total_deposits,
-								WithdrawReasons::TRANSFER,
-								ExistenceRequirement::AllowDeath,
-							)?
-						);
-						Self::deposit_event(Event::PaymentRefundedToMerchant { 
-							merchant: payment_info.merchant,
-							id: payment_id, 
-							now: T::Moment::now(),
-						});
-					}
-					//	Delete from storage 
-					PaymentInfo::<T>::remove(&payment_id);
-					pallet_scheduler::Pallet::<T>::cancel_named(payment_info.name);
-					
-					Self::deposit_event(Event::PaymentPlanKilled { 
-						merchant: maybe_owner,
-						id: payment_id, 
-						now: T::Moment::now()
-					});	
-				},
-			} 
-			Ok(())
+
+			Self::do_delete(
+				maybe_owner,
+				payment_id, 
+				Event::PaymentPlanKilled { 
+					merchant: maybe_owner,
+					id: payment_id, 
+					now: T::Moment::now()
+				}
+			)
 		}
 		///	Transfer ownership of a payment plan to an approved delegate 
 		///	Origin 
@@ -600,28 +495,17 @@ use super::*;
 			};
 			let delegate = T::Lookup::lookup(delegate)?;
 
-			match !Self::verify_new_plan(&payment_id) { 
-				true => {
-					return Err(Error::<T>::PaymentPlanDoesNotExist)
-				},	
-				_ => {
-					let mut payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
-
-					if let Some(check_owner) = maybe_owner { 
-						ensure!(payment_info.merchant == check_owner, Error::<T>::UnAuthorisedCall);
-					}
-					payment_info.merchant = Some(delegate); 
-					PaymentInfo::<T>::insert(&payment_id, &payment_info);
-					
-					Self::deposit_event(Event::TransferApproved { 
-						owner: maybe_owner, 
-						new_owner: delegate,
-						id: payment_id,
-						now: T::Moment::now()
-					});
+			Self::do_transfer_ownership(
+				maybe_owner, 
+				payment_id, 
+				delegate,
+				Event::TransferApproved { 
+					owner: maybe_owner, 
+					new_owner: delegate,
+					id: payment_id,
+					now: T::Moment::now()
 				}
-			}
-			Ok(().into())
+			)
 		}
 		///	Issue a new class of payment plans from a priviledged origin 
 		/// There will be no assets stored inside of this
@@ -635,56 +519,31 @@ use super::*;
 			#[pallet::compact] required_payment: T::Balance,
 			#[pallet::compact] freezer: <T::Lookup as StaticLookup>::Source,
 			#[pallet::compact] set_frozen: bool,
+			#[pallet::compact] schedule_periodic_collection: Frequency,
+			#[pallet::compact] collection_portion: Option<Portion>,
 		) -> DispatchResult { 
 			T::ForceOrigin::ensure_signed(origin)?;	
+			
 			let owner = T::Lookup::lookup(origin)?;
 			let freezer = T::Lookup::lookup(origin)?;
 			let payment_id = Self::next_payment_id();
 
-			match !Self::verify_new_plan(&payment_id) { 
-				_ => {
-					return Err(Error::<T>::PaymentPlanDoesNotExist);
-				},
-				true => {
-					let bounded_name: BoundedVec<u8, T::StringLimit> =
-					name.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
-					
-					let deposit = T::SubmissionDeposit::get();
-					
-					let new_payment = Self::new_payment_plan()
-						.identified_by(payment_id.clone())
-						.owned_by(owner.clone())
-						.with_name(bounded_name.clone())
-						.min_payment()
-						.new_deposit(required_payment)
-						.payment_frequency(frequency)
-						.total_subscribers(Zero::zero())
-						.freezer(freezer)
-						.freeze_payments(set_frozen)
-						.build();
-
-					let imbalance = T::Currency::withdraw(
-						&owner, 
-						deposit, 
-						WithdrawReasons::TRANSFER,
-						ExistenceRequirement::AllowDeath
-					)?;
-					//	Create a fund, imabalance is empty 
-					T::Currency::resolve_creating(
-						&Self::fund_account_id(payment_id),
-						imbalance
-					);
-					PaymentInfo::<T>::insert(payment_id, new_payment);
-					//	Insert to storage map 
-					Self::deposit_event(Event::PaymentPlanCreated { 
-						merchant: owner,
-						id: payment_id, 
-						now: T::Moment::now(),
-					});
+			Self::do_create(
+				payment_id, 
+				name,
+				required_payment,
+				frequency,
+				owner.clone(), 
+				freezer.clone(),
+				schedule_periodic_collection,
+				collection_portion,
+				T::SubmissionDeposit::get(),
+				Event::PaymentPlanCreated { 
+					merchant: owner,
+					id: payment_id, 
+					now: T::Moment::now(),
 				}
-			}
-
-			Ok(())
+			)
 		}
 		///	Block further unpriviledge transfers from an account 
 		/// Origin must be Signed and the sender should be the Freezer of the Payment PLan 
@@ -693,27 +552,20 @@ use super::*;
 			origin: OriginFor<T>,
 			#[pallet::compact] payment_id: PaymentIndex,
 		) -> DispatchResultWithPostInfo {
-			let merchant = ensure_signed(origin)?;
+			let maybe_owner: Option<T::AccountId> = match T::ForceOrigin::try_origin(origin) { 
+				Ok(_) => None, 
+				Err(origin) => Some(ensure_signed(origin)?),
+			};
 
-			match !Self::verify_new_plan(&payment_id) { 
-				true => {
-					return Err(Error::<T>::PaymentPlanDoesNotExist);
-				},
-				_ => { 
-					let mut payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
-					ensure!(payment_info.freezer == merchant, Error::<T>::UnAuthorisedCall);
-					payment_info.is_frozen = true;
-					
-					PaymentInfo::<T>::insert(&payment_id, payment_info);
-					Self::deposit_event(Event::Frozen { 
-						freezer: merchant,
-						id: payment_id, 
-						now: T::Moment::now()
-					});
+			Self::do_freeze(
+				maybe_owner,
+				payment_id,
+				Event::Frozen { 
+					freezer: maybe_owner,
+					id: payment_id, 
+					now: T::Moment::now()
 				}
-			}
-
-			Ok(().into())
+			)
 		}
 		#[pallet::weight(10_000)]
 		pub fn unfreeze_payment_plan(
@@ -724,29 +576,15 @@ use super::*;
 				Ok(_) => None,
 				Err(origin) => Some(ensure_signed(origin)? ),
 			};
-			match !Self::verify_new_plan(&payment_id) { 
-				true => {
-					return Err(Error::<T>::PaymentPlanDoesNotExist)
-				},	
-				_ => {
-					let mut payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
-					ensure!(!payment_info.is_frozen, Error::<T>::AlreadyUnFrozen);
-
-					if let Some(check_owner) = maybe_owner { 
-						ensure!(payment_info.freezer == check_owner, Error::<T>::UnAuthorisedCall);
-					}
-					payment_info.is_frozen = true;
-					PaymentInfo::<T>::insert(&payment_id, payment_info);
-
-					Self::deposit_event(Event::UnFrozen { 
-						who: maybe_owner,
-						id: payment_id, 
-						now: T::Moment::now()
-					});
+			Self::do_unfreeze(
+				maybe_owner,
+				payment_id,
+				Event::UnFrozen { 
+					who: maybe_owner,
+					id: payment_id, 
+					now: T::Moment::now()
 				}
-			}
-
-			Ok(().into())
+			)
 		}
 		///	Remove User from the Subscription List 
 		/// Refund user for any unspent subscription period 
@@ -761,117 +599,79 @@ use super::*;
 			T::ForceOrigin::ensure_signed(origin)?;
 			let subscriber = T::Lookup::lookup(subscriber)?;
 
-			match !Self::verify_new_plan(&payment_id) {
-				true => {
-					return Err(Error::<T>::PaymentPlanDoesNotExist)
+			Self::do_cancel(
+				subscriber,
+				payment_id,
+				Event::PaymentRefundedToUser { 
+					user: subscriber,
+					id: payment_id, 
+					now: T::Moment::now()
 				},
-				_ => {
-					let subscription_info = Subscriptions::<T>::get(&subscriber).ok_or(Error::<T>::Unknown)?;
-					let mut info = subscription_info.1;
-					ensure!(!info.subscribed_to.is_empty(), Error::<T>::UserNotSubscribed);
-					ensure!(!info.subscribed_to.contains(&payment_id), Error::<T>::UserNotSubscribed);
-					
-					//	Calculate the amount of refund given to user for unspent period 
-					if info.required_payment != Zero::zero()  { 
-						//	Get the users payment for this CURRENT PERIOD, not the entire paymentsm, ensure merchants are collecting 
-						//	User payments on a periodic schedule
-						let balance = Self::get_payment_info(payment_id, &subscriber);						
-					 
-						let begin_period = info.start;
-						let payment_due = info.frequency_of.frequency();
-						let difference =  payment_due - I32F32::from_num(info.start);
-						let ratio = I32F32::from_num(difference)/payment_due;
-						
-						//	How much the user get to keep 
-						let new_ratio = I32F32::from_num(1) - ratio;
-						
-						//	If the ratio is not 1, then we can refund all unused period 
-						if new_ratio != I32F32::from_num(1) { 
-							//	Refund on current subscription period, ensure the collection has their scheduled date dispatchable function 
-							//	The line below is: 
-							//	Refunded amount = CurrentPeriodBalance(1 - Ratio between the starting date and due payment date)
-							//	ie RefundedToUser = 100(1 - 0.5 <-- or 50% before finishing the period) => refund 50 to user
-							let user_refund = balance.saturating_mul(new_ratio);
-							
-							// Return funds to caller without charging a transfer fee
-							let _ = T::Currency::resolve_into_existing(&subscriber, 
-								T::Currency::withdraw(
-								&Self::fund_account_id(payment_id), 
-									user_refund, 
-									WithdrawReasons::TRANSFER, 
-									ExistenceRequirement::AllowDeath
-								)?
-							);
-							Self::deposit_event(Event::PaymentRefundedToUser { 
-								user: subscriber,
-								id: payment_id, 
-								now: T::Moment::now()
-							});
-						}
-					} 
-					pallet_proxy::Pallet::<T>::remove_proxies(&subscriber);
-					//	Delete subscription info 
-					Subscriptions::<T>::remove(&subscriber);
-					Self::deposit_event(Event::RecurringPaymentCancelled { 
-						user: subscriber,
-						id: payment_id,
-						now: T::Moment::now(),
-					});
+				Event::RecurringPaymentCancelled { 
+					user: subscriber,
+					id: payment_id,
+					now: T::Moment::now(),
 				}
-			}
-			Ok(())
+			)
 		}
-
+		// Force user to payment without refunding 
 		#[pallet::weight(10_000)]
 		pub fn force_payment(
 			origin: OriginFor<T>,
 			subscriber: <T as StaticLookup>::Source,
 			#[pallet::compact] payment_id: PaymentIndex,
-		) -> DispatchResultWithPostInfo { 
+		) -> DispatchResult { 
 			let admin = T::ForceOrigin::ensure_signed(origin)?;
 			let subscriber = T::Lookup::lookup(subscriber)?;
 
-			match !Self::verify_new_plan(&payment_id) { 
-				true => {
-					return Err(Error::<T>::PaymentPlanDoesNotExist);
-				},	
-				_ => {
-					let mut payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
-					let mut subscription_info = Subscriptions::<T>::get(&subscriber).ok_or(Error::<T>::UserDoesNotExist)?;
-					let now = frame_system::Pallet::block_number();
-					
-					//	Check if the user is associated with the subscription info 
-					ensure!(subscription_info.1.owner == subscriber, Error::<T>::NotASubscriber);
-					//	Check how many users are subscribed to this payment plan, if zero, emit error
-					ensure!(payment_info.num_subscribers != Zero::zero(), Error::<T>::NoSubscribersFound);
-					//	Check if the payment plan is blocking any transfers
-					ensure!(!payment_info.is_frozen, Error::<T>::Frozen);
-					//	Check if the user is subscribed to the payment plan 
-					ensure!(subscription_info.1.subscribed_to.contains(&payment_id), Error::<T>::UserNotSubscribed);
-					//	Check if the user is meant to pay now 
-					ensure!(subscription_info.1.next_payment == now, Error::<T>::NotDueYet);
-					//	Get users that are subscribed into this payment plan 
-					
-					//	Force call the user to transfer funds into the child trie
-					let force_call = T::Currency::force_transfer(
-						admin,
-						&subscriber, 
-						&Self::fund_account_id(payment_id),
-						subscription_info.required_payment,)?;
-				
-					//	If force payment call fails, force_cancel user subscription 
-					if force_call.is_err() { 
-						//	Revoke user Priviledges
-						Self::force_cancel_subscription(
-							admin, 					
-							payment_id,
-							subscriber
-						)?;
-					}
-				},
-			}
-
-			Ok(().into())
+			Self::do_force_pay(
+				subscriber,
+				admin,
+				payment_id, 
+				Event::RecurringPaymentCancelled { 
+					user: subscriber,
+					id: payment_id,
+					now: T::Moment::now(),
+				}
+			)
+		}
+		//	Refund first then generate new values 
+		#[pallet::weight(10_000)]
+		pub fn force_clear_payment_plan(
+			origin: OriginFor<T>,
+        	#[pallet::compact] payment_id: PaymentIndex, 
+        	#[pallet::compact] name: Vec<u8>,
+        	#[pallet::compact] new_owner: T::AccountId,
+        	#[pallet::compact] min_balance: T::Balance,
+        	#[pallet::compact] frequency: Frequency,
+        	#[pallet::compact] freezer: <T::Lookup as StaticLookup>::Source,
+        	#[pallet::compact] is_frozen: bool,
+        	#[pallet::compact] schedule_periodic_collection: Frequency,
+		) -> DispatchResult { 
+			let maybe_owner = match T::ForceOrigin::try_origin(origin) {
+					Ok(_) => None,
+					Err(origin) => Some(ensure_signed(origin)? 
+				),
+			};
+			Self::refund_to_users(maybe_owner, &payment_id);
+			//	Set Values to User input
+			Self::force_default(
+				maybe_owner,
+				payment_id, 
+				name,
+				new_owner,
+				min_balance,
+				frequency,
+				freezer,
+				is_frozen,
+				schedule_periodic_collection,
+				Self::deposit_event(Event::EditedPaymentPlan { 
+					merchant: maybe_owner, 
+					id: payment_id, 
+					now: T::Moment::now()
+					},
+				)
+			)
 		}
 	} 	
 }
