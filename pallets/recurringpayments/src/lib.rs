@@ -106,10 +106,12 @@ use super::*;
 		type StringLimit: Get<u32>;
 
 		//	The amount to be held on deposit by the depositor of a Payment Plan 
+		//	the create call will be used to create a new fund, a deposit must be made first 
 		type SubmissionDeposit: Get<BalanceOf<Self>>;
+		// Time used for computing time 
+		type UnixTime: UnixTime;
 	}
 
-	
 	pub type SubscriptionIndex = u32; 
 	//pub type AccountId<T> = <T as frame_system::Config>::AccountId;
 	pub type BalanceOf<T> = <<T as Config>::Assets as Inspect<<T as frame_system::Config>::AccountId>>::Balance;
@@ -257,9 +259,19 @@ use super::*;
 		MinCannotBeZero
 
 	}
-	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
-	// These functions materialize as "extrinsics", which are often compared to transactions.
-	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
+
+	///	Additional Builder methods is Also Provided as follows: 
+	///	let new_payment = Self::new_payment_plan()
+			// 	.identified_by(payment_id.clone())
+			// 	.owned_by(merchant.clone())
+			// 	.with_name(bounded_name.clone())
+			// 	.min_payment(required_payment)
+			// 	.new_deposit(Zero::zero())
+			// 	.payment_frequency(frequency)
+			// 	.total_subscribers(Zero::zero())
+			// 	.freezer(merchant)
+			// 	.freeze_payments(false)
+			// 	.build();
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::weight(10_000)]
@@ -267,57 +279,27 @@ use super::*;
 			origin: OriginFor<T>, 
 			#[pallet::compact] required_payment: T::Balance,
 			#[pallet::compact] frequency: Frequency,
-			#[pallet::compact] name: Vec<u8>
+			#[pallet::compact] name: Vec<u8>,
+			freezer: Option<T::AccountId>,
 		) -> DispatchResult { 
 			let merchant = ensure_signed(origin)?;
 			//	ensure merchants can only create payment plans
 			let payment_id = Self::next_payment_id();
-			
-			match !Self::verify_new_plan(&payment_id) { 
-				//	Does not exist, create a new one
-				true => { 
-					let bounded_name: BoundedVec<u8, T::StringLimit> =
-					name.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
-					ensure!(!required_payment.is_zero(), Error::<T>::MinCannotBeZero);
-					let deposit = T::SubmissionDeposit::get();
-					
-					let new_payment = Self::new_payment_plan()
-						.identified_by(payment_id.clone())
-						.owned_by(merchant.clone())
-						.with_name(bounded_name.clone())
-						.min_payment(required_payment)
-						.new_deposit(Zero::zero())
-						.payment_frequency(frequency)
-						.total_subscribers(Zero::zero())
-						.freezer(merchant)
-						.freeze_payments(false)
-						.build();
 
-					let imbalance = T::Currency::withdraw(
-						&merchant, 
-						deposit, 
-						WithdrawReasons::TRANSFER,
-						ExistenceRequirement::AllowDeath
-					)?;
-					//	Create a fund, imabalance is empty 
-					T::Currency::resolve_creating(
-						&Self::fund_account_id(payment_id),
-						imbalance
-					);
-					PaymentInfo::<T>::insert(payment_id, new_payment);
-					//	Insert to storage map 
-					Self::deposit_event(Event::PaymentPlanCreated { 
-						merchant,
-						id: payment_id, 
-						now: T::Moment::now(),
-					});
-				},
-				_ => { 
-					// ALready exists
-					return Err(Error::<T>::PaymentPlanAlreadyExist);
+			Self::do_create(
+				payment_id, 
+				name,
+				required_payment,
+				frequency,
+				merchant.clone(), 
+				freezer,
+				T::SubmissionDeposit::get(),
+				Event::PaymentPlanCreated { 
+					merchant,
+					id: payment_id, 
+					now: T::Moment::now(),
 				}
-			}
-			Ok(())
+			)
 		}
 		///	Subscribe to Payment Function 
 		/// This allows the user to automate recurring payments according to their desired merchant 
@@ -336,6 +318,18 @@ use super::*;
 		/// 10. Register the root as the Delagator for the user, so we can force payments later on if the dispatchable fails to work (Users shoudl be aware of this)
 		/// 11. Register a Scheduled call to allow for next_payments to occur automatically, based on the Frequency inside of PaymentPlan 
 		/// 12. Emit event 
+		/// 
+		/// Methods Provided for Subscription Struct 
+		/// let subcription_info = Self::new_subscription()
+		/// .account_id(subscriber.clone())
+		/// .start_date(start_date)
+		/// .next_payment(next_payment)
+		///.frequency_type(payment_plan.frequency)
+		/// .set_num_freq(num_frequency)
+		/// .min_payments(min_payment)
+		/// .subscribed_list(sub_list)
+		/// .build();
+	 
 		#[pallet::weight(10_000)]
 		pub fn subscribe_payment(
 			origin: OriginFor<T>,
@@ -345,105 +339,24 @@ use super::*;
 		) -> DispatchResultWithPostInfo { 
 			let subscriber = ensure_signed(origin)?;
 			
-			match !Self::verify_new_plan(&payment_id) { 
-				//	Does not exist 
-				true => { 
-					return Err(Error::<T>::PaymentPlanDoesNotExist);
+			Self::do_subscribed( 
+				payment_id,
+				min_payment,
+				num_frequency,
+				subscriber, 
+				Event::PaymentSent { 
+					from: &subscriber,
+					to: &Self::fund_account_id(payment_id),
+					amount: min_payment.clone(),
+					id: payment_id.clone(),
+					now: T::Moment::now()
+				},
+				Event::SubcriptionCreated { 
+					subscriber,
+					id: payment_id,
+					now: T::Moment::now()
 				}
-				//	Exist
-				_ => {
-					//	Access Payment plan information  
-					let mut payment_plan = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
-					// ensure the user has enough to supplement for required_payment
-					ensure!(min_payment >= payment_plan.required_payment, Error::<T>::InsufficientBalance); 
-					//	check if the PaymentPlan is Frozen
-					ensure!(!payment_plan.is_frozen, Error::<T>::Frozen);
-					//	else -> Transfer funds into fund_index 
-					T::Currency::transfer(
-						&subscriber, 
-						&Self::fund_account_id(payment_id),
-						min_payment,
-						ExistenceRequirement::AllowDeath
-					)?;
-					payment_plan.total_deposits += min_payment;
-					//	Increment Number of Subscribers 
-					payment_plan.num_subscribers.checked_add(1).ok_or(ArithmeticError::Overflow)?;
-
-					let payment = Self::get_payment_info(payment_id, &subscriber);
-					let payment = payment.saturating_add(min_payment);
-
-					Self::insert_payment(payment_id, &subscriber, payment);
-					//	build Subscription BUilder for user, ensuring the Frequency matches that of the PaymentPlan
-					//* -- Below needs revision --  */
-					let start_date: Moment = T::Moment::now();
-					let next_payment = payment_plan.frequency.frequency()
-						.checked_add(start_date)
-						.ok_or(ArithmeticError::Overflow)?;
-					// Store paymentid into subcription list of user 
-					let mut sub_list = vec![];
-					
-					sub_list.push(payment_id);
-
-					let subcription_info = Self::new_subscription()
-						.account_id(subscriber.clone())
-						.start_date(start_date)
-						.next_payment(next_payment)
-						.frequency_type(payment_plan.frequency)
-						.set_num_freq(num_frequency)
-						.min_payments(min_payment)
-						.subscribed_list(sub_list)
-						.build();
-					
-					let subscriber_id = Self::next_subscriber_id();
-					
-					//	Add Subscriber Index and Subscription Info into Storage
-					Subscriptions::<T>::insert(&subscriber, 
-						(&subscriber, subcription_info.clone()));
-					PaymentInfo::<T>::insert(payment_id, &payment_plan);
-
-					//	Emit Event for Sending Payment to the Merchant 
-					Self::deposit_event(Event::PaymentSent { 
-						from: &subscriber,
-						to: &Self::fund_account_id(payment_id),
-						amount: min_payment.clone(),
-						id: payment_id.clone(),
-						now: T::Moment::now()
-					});
-
-					//	Add proxy delegate for the user to allow for scheduled dispatchables
-					pallet_proxy::Pallet::<T>::add_proxy(subscriber, 
-						T::ForceOrigin, 
-						Default::default(), 
-						Zero::zero());
-
-					//	Schedule a dispatchable function based on frequency
-					//	Schedule name is based on the PaymentPlan Name
-					//	This is specified according to the users preference 
-
-					//	Scheduled for the next Payment which involves reducing num_frequency by 1 until it reaches zero
-					pallet_scheduler::Pallet::<T>::schedule_named(
-						&subscriber,
-						payment_plan.name,
-						&next_payment,
-						Some((payment.frequency, num_frequency.unwrap_or_default())),
-						Default::default(),
-						Pallet::<T>::subscribe_payment(
-							&subscriber,
-							&payment_id,
-							&min_payment,
-							num_frequency.unwrap_or_else(||
-								num_frequency.checked_sub(1).ok_or(ArithmeticError::Underflow)
-							)
-						),
-					);
-					Self::deposit_event(Event::SubcriptionCreated { 
-						subscriber,
-						id: payment_id,
-						now: T::Moment::now()
-					});
-				}	
-			}
-			Ok(().into())
+			)
 		}
 		//	Ensure the merchants can only call this function, block off unauthorised transactions 
 		//	Allow for merchants to withdraw a portion of funds 
