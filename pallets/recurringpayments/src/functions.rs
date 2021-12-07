@@ -98,13 +98,15 @@ impl<T: Config> Pallet<T> {
         frequency: Frequency,
         merchant: T::AccountId,
         freezer: Option<T::AccountId>,
+        schedule_periodic_collection: Frequency,
         deposit: BalanceOf<T>,
         event: Event<T>,
     ) -> DispatchResult {
-        
+                
         ensure!(!PaymentInfo::<T>::contains_key(&payment_id), Error::<T>::PaymentPlanAlreadyExist);
         let bounded_name: BoundedVec<u8, T::StringLimit> =
 			name.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
+        
         PaymentInfo::<T>::insert(
             payment_id,
             PaymentPlan { 
@@ -116,7 +118,8 @@ impl<T: Config> Pallet<T> {
                 frequency,
                 num_subscribers: Zero::zero(),
                 freezer: freezer.unwrap_or(merchant),
-                is_frozen: false
+                is_frozen: false,
+                schedule_periodic_collection
             }
         );
         let imbalance = T::Currency::withdraw(
@@ -130,11 +133,21 @@ impl<T: Config> Pallet<T> {
             &Self::fund_account_id(payment_id),
             imbalance
         );
+        //  Schedule Periodic Collections
+        
+
+
         Self::deposit_event(event);
         Ok(())
 
     }
-    pub(super) fn do_collect() {}
+    pub(super) fn do_collect_payments(
+        payment_id: PaymentIndex,
+        
+    ) -> DispatchResult {
+
+        Ok(())
+    }
     fn do_transfer_ownership() {}
     
     pub(super) fn do_subscribed(

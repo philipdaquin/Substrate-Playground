@@ -278,9 +278,10 @@ use super::*;
 		pub fn create_payment_system(
 			origin: OriginFor<T>, 
 			#[pallet::compact] required_payment: T::Balance,
-			#[pallet::compact] frequency: Frequency,
+			#[pallet::compact] user_frequency: Frequency,
 			#[pallet::compact] name: Vec<u8>,
-			freezer: Option<T::AccountId>,
+			#[pallet::compact] freezer: Option<T::AccountId>,
+			#[pallet::compact] schedule_periodic_collection: Frequency
 		) -> DispatchResult { 
 			let merchant = ensure_signed(origin)?;
 			//	ensure merchants can only create payment plans
@@ -290,9 +291,10 @@ use super::*;
 				payment_id, 
 				name,
 				required_payment,
-				frequency,
+				user_frequency,
 				merchant.clone(), 
 				freezer,
+				schedule_periodic_collection,
 				T::SubmissionDeposit::get(),
 				Event::PaymentPlanCreated { 
 					merchant,
@@ -488,6 +490,7 @@ use super::*;
 			#[pallet::compact] frequency: Frequency,
 			#[pallet::compact] name_s: Vec<u8>,
 			#[pallet::compact] freezer: <T as StaticLookup>::Source,
+			#[pallet::compact] schedule_periodic_collection: Frequency,
 		) -> DispatchResultWithPostInfo { 
 			let seller = ensure_signed(origin)?;
 			let freezer = T::Lookup::lookup(freezer);
@@ -515,6 +518,7 @@ use super::*;
 							num_subscribers: payment_info.num_subscribers,
 							freezer,
 							is_frozen: payment_info.is_frozen,
+							schedule_periodic_collection
 						}
 					);
 					Self::deposit_event(Event::EditedPaymentPlan { 

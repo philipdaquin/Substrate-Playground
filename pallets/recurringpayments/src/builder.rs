@@ -33,7 +33,8 @@ pub struct PaymentPlanBuilder<AccountId, Balance>
 	frequency: Frequency,
 	num_subscribers: u32,
 	freezer: AccountId,
-	is_frozen: bool
+	is_frozen: bool,
+	schedule_periodic_collection: Frequency
 
 }
 //	Set up default values for payment plans -> Set to default values 
@@ -51,6 +52,7 @@ impl<AccountId, Balance> Default for PaymentPlanBuilder<AccountId, Balance>
 			num_subscribers: Zero::zero(),
 			freezer: AccountId::default(),
 			is_frozen: false,
+			schedule_periodic_collection: Frequency::None
 		}
 	}
 }
@@ -105,7 +107,8 @@ impl<AccountId, Balance> PaymentPlanBuilder<AccountId, Balance>
 			frequency: self.frequency,
 			num_subscribers: self.num_subscribers,
 			freezer: self.freezer,
-			is_frozen: self.is_frozen
+			is_frozen: self.is_frozen,
+			schedule_periodic_collection: self.schedule_periodic_collection
 		}
 	}
 }

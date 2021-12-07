@@ -77,6 +77,7 @@ pub struct PaymentPlan<AccountId, Balance> {
 	//	Whether the asset is frozen for non-admin transfer
 	pub is_frozen: bool,  
 	//	> Number of subscribers currently 
+	pub schedule_periodic_collection: Frequency,
 
 }
 //	This will help us track the user's next payment 
