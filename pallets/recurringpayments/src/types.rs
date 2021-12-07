@@ -44,7 +44,7 @@ pub enum Frequency {
 	Yearly
 }
 impl Frequency { 
-	pub fn frequency(&self) -> u64 { 
+	pub fn frequency(&self) -> BlockNumber { 
 		match self { 
 			Frequency::Daily => DAYS,
 			Frequency::Monthly => MONTHLY,

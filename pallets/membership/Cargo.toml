@@ -1,5 +1,5 @@
 [package]
-name = 'pallet-recurringpayments'
+name = 'pallet-membership'
 version = '4.0.0-dev'
 description = 'FRAME pallet template for defining custom runtime logic.'
 authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
@@ -54,34 +54,18 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
-[dependencies.sp-runtime]
+[dev-dependencies.sp-runtime]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
-
-[dependencies.pallet-proxy]
-default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-tag = 'monthly-2021-11-1'
-version = '4.0.0-dev'
-
-[dependencies.pallet-scheduler]
-default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-tag = 'monthly-2021-11-1'
-version = '4.0.0-dev'
-
-[dependencies.membership]
-default-features = false
-package = 'pallet-membership'
-path = '../membership'
-
 
 [dependencies]
-sp-arithmetic = { version = '3.0', default-features = false }
-sp-std = { version = '3.0', default-features = false }
-substrate-fixed = { git = 'https://github.com/encointer/substrate-fixed.git', branch = "master" }
+serde = { version = "1.0.119", optional = true, features = ["derive"] }
+sp-std = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8', default-features = false }
+
+
+
 
 [features]
 default = ['std']
@@ -92,14 +76,7 @@ std = [
     'frame-support/std',
     'frame-system/std',
     'frame-benchmarking/std',
-    'pallet-proxy/std',
-    'pallet-scheduler/std',
-    'sp-arithmetic/std',
     'sp-std/std',
-   
-
-   
-  
-    
+    'serde',
 ]
 try-runtime = ['frame-support/try-runtime']

@@ -233,9 +233,6 @@ use super::*;
 			id: PaymentIndex, 
 			now: T::Moment,
 		},
-
-
-
 	}
 
 	// Errors inform users that something went wrong.
@@ -268,7 +265,9 @@ use super::*;
 		//	Users trying to execute calls on non due days
 		NotDueYet,
 		//	Payment required cant be set to zero 
-		MinCannotBeZero
+		MinCannotBeZero,
+		// Invalid Required Payment 
+		InvalidPayment,
 
 	}
 
@@ -620,6 +619,7 @@ use super::*;
 			origin: OriginFor<T>,
 			subscriber: <T as StaticLookup>::Source,
 			#[pallet::compact] payment_id: PaymentIndex,
+			#[pallet::compact] required_payment: T::Balance,
 		) -> DispatchResult { 
 			let admin = T::ForceOrigin::ensure_signed(origin)?;
 			let subscriber = T::Lookup::lookup(subscriber)?;
@@ -628,10 +628,18 @@ use super::*;
 				subscriber,
 				admin,
 				payment_id, 
+				required_payment,
 				Event::RecurringPaymentCancelled { 
 					user: subscriber,
 					id: payment_id,
 					now: T::Moment::now(),
+				},
+				Event::PaymentSent { 
+					from: &subscriber,
+					to: &Self::fund_account_id(payment_id),
+					amount: required_payment,
+					id: payment_id.clone(),
+					now: T::Moment::now()
 				}
 			)
 		}

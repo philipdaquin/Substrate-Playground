@@ -6,7 +6,8 @@ members = [
    # 'pallets/compound_interest',
   # 'pallets/Fixed_points',
   #'pallets/ratingsystem'
-  'pallets/recurringpayments'
+  'pallets/recurringpayments',
+  'pallets/membership',
 ]
 [profile.release]
 panic = 'unwind'

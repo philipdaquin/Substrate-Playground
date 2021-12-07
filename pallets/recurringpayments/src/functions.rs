@@ -100,6 +100,17 @@ impl<T: Config> Pallet<T> {
         // https://crates.parity.io/frame_support/storage/child/fn.kill_storage.html
         child::kill_storage(&id, None);
     }
+    fn calculate_next_duedate(
+        start: T::BlockNumber, 
+        frequency: Frequency
+    ) -> Result<BlockNumber, DispatchError> {
+        let now = frame_system::Pallet::block_number();
+        let mut due_date = start.saturating_add(frequency.frequency());
+        
+        if due_date == now { 
+            due_date = due_date.saturating_add(frequency.frequency())
+        }
+    }
     pub(super) fn do_create(
         payment_id: PaymentIndex,
         name: Vec<u8>,
@@ -232,6 +243,7 @@ impl<T: Config> Pallet<T> {
         event_payment_sent: Event<T>,
         event_sub_created: Event<T>,
     ) -> DispatchResult {
+        
         ensure!(!PaymentInfo::<T>::contains_key(&payment_id), Error::<T>::PaymentPlanDoesNotExist);
 
         //	Access Payment plan information  
@@ -257,12 +269,7 @@ impl<T: Config> Pallet<T> {
 		Self::insert_payment(payment_id, &subscriber, payment);
 
         let starting_block = frame_system::Pallet::<T>::block_number();
-        
-        let start_date: Moment = T::Moment::now();
-		let next_payment = payment_plan.frequency.frequency()
-			.checked_add(start_date)
-			.ok_or(ArithmeticError::Overflow)?;
-		// Store paymentid into subcription list of user 
+        let mut due_date = Self::calculate_next_duedate(starting_block, payment_plan.frequency)?;
 		let mut sub_list = vec![];
 		
 		sub_list.push(payment_id);
@@ -272,9 +279,9 @@ impl<T: Config> Pallet<T> {
         Subscriptions::<T>::insert(&subscriber, 
             (&subscriber_id, Subscription { 
                     owner: subscriber,
-                    start: start_date,
+                    start: starting_block,
                     required_payment: min_payment,
-                    next_payment,
+                    next_payment: due_date,
                     frequency_of: payment_plan.frequency,
                     num_frequency: num_frequency.unwrap_or_default(),
                     subscribed_to: sub_list,
@@ -297,17 +304,14 @@ impl<T: Config> Pallet<T> {
 		pallet_scheduler::Pallet::<T>::schedule_named(
             &subscriber,
             payment_plan.name,
-            &next_payment,
+            &due_date,
             Some(payment.frequency, num_frequency.unwrap_or_default()),
             Default::default(),
-            Pallet::<T>::subscribe_payment(
-                &subscriber,
-                &payment_id,
-                &min_payment,
-                num_frequency.unwrap_or_else(||
-                    num_frequency.checked_sub(1).ok_or(ArithmeticError::Underflow)
-                )
-            ),
+            Pallet::<T>::force_payment(
+                T::ForceOrigin, 
+                subscriber, 
+                payment_id
+            )
         );
         Self::deposit_event(event_sub_created);
 
@@ -500,14 +504,18 @@ impl<T: Config> Pallet<T> {
         subscriber: T::AccountId,
         admin: T::AccountId, 
         payment_id: PaymentIndex,
+        required_payment: T::Balance,
         event_cancelled: Event<T>,
+        event_paid: Event<T>,
     ) -> DispatchResult {
         ensure!(!PaymentInfo::<T>::contains_key(&payment_id), Error::<T>::PaymentPlanDoesNotExist);
         
         let mut payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
         let mut subscription_info = Subscriptions::<T>::get(&subscriber).ok_or(Error::<T>::UserDoesNotExist)?;
         let now = frame_system::Pallet::block_number();
-        
+
+        //  Check if the required payments matches with the users subcription 
+        ensure!(subscription_info.1.required_payment == payment_info.required_payment, Error::<T>::InvalidPayment);
         //	Check if the user is associated with the subscription info 
         ensure!(subscription_info.1.owner == subscriber, Error::<T>::NotASubscriber);
         //	Check how many users are subscribed to this payment plan, if zero, emit error
@@ -535,8 +543,14 @@ impl<T: Config> Pallet<T> {
             //	Remove schedule dispatchable
             pallet_scheduler::Pallet::<T>::cancel_named(subscriber, payment_info.name);
             //  Cancel User Membership
+
+            Self::deposit_event(event_cancelled);
+
+        } else { 
+            Self::deposit_event(event_paid)
+
+            //  Reschedule next the payment 
         }
-        Self::deposit_event(event_cancelled);
 
         Ok(())
     }
@@ -612,6 +626,6 @@ impl<T: Config> Pallet<T> {
         }
         Ok(())
     }
-    fn calculate_leftover() {}
-    fn calculate_next_duedate() {}
+    pub(super) fn calculate_leftover() {}
+    
 }
