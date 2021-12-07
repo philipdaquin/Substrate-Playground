@@ -362,13 +362,18 @@ use super::*;
 		}
 		//	Ensure the merchants can only call this function, block off unauthorised transactions 
 		//	Allow for merchants to withdraw a portion of funds 
+		// Event::PaymentCollected { 
+		// 	merchant,
+		// 	id: payment_id,
+		// 	now: T::Moment::now()
+		// }
 		#[pallet::weight(10_000)]
 		pub fn collect_payments(
 			origin: OriginFor<T>,
 			#[pallet::compact] payment_id: PaymentIndex,
 			#[pallet::compact] specified_portion: Portion, // later to be implemented using Substrate Fixed
 			#[pallet::compact] delete_payment_plan_forever: bool,
-			#[pallet::compact] periodic_collection: Frequency
+			#[pallet::compact] schedule_periodic_collection: Frequency
 		) -> DispatchResult { 
 			let merchant = ensure_signed(origin)?;
 			

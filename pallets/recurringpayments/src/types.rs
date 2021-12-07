@@ -14,7 +14,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+use sp_arithmetic::Percent;
 use codec::{Encode, Decode, MaxEncodedLen};
 use frame_support::{RuntimeDebug, traits::OnTimestampSet};
 use scale_info::TypeInfo;
@@ -116,10 +116,10 @@ impl<AccountId, Moment> PaymentPlan<AccountId, Moment> {
 	}
 }
 
-pub const AQUARTER: u8 = 25;
-pub const HALF: u8 = 50;
-pub const THREEQUARTERS: u8 = 50;
-pub const FULL: u8 = 100;
+pub const AQUARTER: Percent = Percent::from_percent(25);
+pub const HALF: Percent = Percent::from_percent(50);
+pub const THREEQUARTERS: Percent = Percent::from_percent(75);
+pub const FULL: Percent = Percent::from_percent(100);
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug)]
 pub enum Portion { 
@@ -130,7 +130,7 @@ pub enum Portion {
 }
 
 impl Portion { 
-	pub fn portion(&self) -> u128 { 
+	pub fn portion(&self) -> Percent { 
 		match self { 
 			Portion::AQuarter => AQUARTER,
 			Portion::Half => HALF,

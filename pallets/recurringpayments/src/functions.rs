@@ -134,7 +134,7 @@ impl<T: Config> Pallet<T> {
             imbalance
         );
         //  Schedule Periodic Collections
-        
+
 
 
         Self::deposit_event(event);
@@ -142,10 +142,44 @@ impl<T: Config> Pallet<T> {
 
     }
     pub(super) fn do_collect_payments(
+        merchant: T::AccountId, 
         payment_id: PaymentIndex,
-        
+        specified_portion: Option<Portion>,
+        schedule_periodic_collection: Frequency,
+        event: Event<T>,
     ) -> DispatchResult {
+        ensure!(!PaymentInfo::<T>::contains_key(&payment_id), Error::<T>::PaymentPlanDoesNotExist);
+        
+        let mut payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
+		
+        ensure!(merchant == payment_info.merchant, Error::<T>::UnAuthorisedCall);
+        ensure!(!payment_info.total_deposits == Zero::zero(), Error::<T>::InsufficientBalance);
 
+        let total_balance = payment_info.total_deposits;
+        //  only collect 50% * total deposit = update the storage 
+        if let Some(amount) = specified_portion { 
+            let per_deposit = amount.portion();
+            let mut total = payment_info.total_deposits;
+            let mut user_requested_amount: T::Balance = total.saturating_mul(per_deposit);
+            let mut new_total_deposit_in_storage = total.checked_sub(user_requested_amount).ok_or(ArithmeticError::Underflow)?;
+
+            payment_info.total_deposits = new_total_deposit_in_storage;
+
+            PaymentInfo::<T>::insert(payment_id, payment_info);
+             //	Ensure we are not chargin fees when the user decides to collect their payments
+		    let _ = T::Currency::resolve_creating( 
+			&payment_info.merchant, 
+            T::Currency::withdraw(
+				&Self::fund_account_id(payment_id),
+				user_requested_amount,
+				WithdrawReasons::TRANSFER,
+				ExistenceRequirement::AllowDeath,
+		    	)?
+		    );
+        }
+        
+		Self::deposit_event(event);
+		
         Ok(())
     }
     fn do_transfer_ownership() {}
