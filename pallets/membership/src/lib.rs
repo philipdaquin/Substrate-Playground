@@ -1,14 +1,35 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+// This file is part of Gamme Finance.
+
+// Copyright (C) 2017-2021 Parity Technologies (UK) Ltd.
+// SPDX-License-Identifier: Apache-2.0
+
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// 	http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! Functions for the Permissioned Membership pallet.
+
 use std::marker::PhantomData;
 use scale_info::{StaticTypeInfo, TypeInfo};
 use codec::{Encode, Decode, Codec};
 use frame_support::{dispatch::{GetCallMetadata, DispatchInfo, Dispatchable, TransactionPriority}, unsigned::{TransactionValidityError, TransactionValidity}, pallet_prelude::{ValidTransaction, TransactionLongevity, InvalidTransaction}};
 pub use pallet::*;
 use sp_runtime::traits::{SignedExtension, DispatchInfoOf, SignedExtensionMetadata};
+
 mod types;
 use crate::types::*;
-
+mod functions;
+use crate::functions::*;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
@@ -129,6 +150,16 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 		AdminAdded { 
 			who: T::AccountId
 		},
+		MemberAdded { 
+			who: T::AccountId,
+			now: T::Moment
+		},
+		RevokeMembership { 
+			who: T::AccountId,
+			pallet_name: Vec<u8>,
+			permission: Permissions,
+			now: T::Moment
+		}
 	}
 
 	#[pallet::error]
@@ -238,128 +269,40 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 
 			Ok(())
 		}
-	} 
-	impl<T: Config> Pallet<T> { 
-		fn do_add_role(
-			role: Role,
-		) -> bool { 
-			let all_roles = Role::<T>::get();
-			
-			if all_roles.contains(&role) { 
-				false
-			}
-			Role::append(role.clone());
-			true 
+		#[pallet::weight(10_000)]
+		pub fn add_member(
+			origin: OriginFor<T>,
+			new_member: <T::Lookup as StaticLookup>::Source
+		) -> DispatchResult { 
+			T::AddOrigin::ensure_origin(origin)?;
+			let new_member = T::Lookup::lookup(new_member)?;
+			let mut members = Member::<T>::get();
+			let location_member = members.binary_search(&new_member)
+				.err()
+				.ok_or(Error::<T>::MemberAlreadyExists)?;
+			members.insert(location_member, new_member.clone());
 
+			Member::<T>::put(&members);
+			Self::deposit_event(Event::MemberAdded { 
+				who: new_member,
+				now: T::Moment::now()
+			});
+			Ok(())
 		}
-		fn verify_manage_access(
-			pallet_name: Vec<u8>,
-			acc: T::AccountId, 
-		) -> bool { 
-			let all_roles = Roles::<T>::get();
-			let role = Role { 
-				pallet_name,
-				permission: Permissions::Management
-			};
-			if all_roles.contains(role.clone) && Permissions::<T>::get((acc, role.clone() )) { 
-				true
-			}
-			false
+		#[pallet::weight(10_000)]
+		pub fn remove_member(
+			origin: OriginFor<T>,
+			curr_member: <T::Lookup as StaticLookup>::Source
+		) -> DispatchResult { 
+			T::RemoveOrigin::ensure_origin(origin)?;
+			let curr_member = T::Lookup::lookup(curr_member)?;
+			let mut members = Member::<T>::get();
+			let location_member = members.binary_search(&curr_member)
+				.ok()
+				.ok_or(Error::<T>::NoneExistentMember)?;
+			members.remove(location_member);
+			Member::<T>::put(members);
+			Ok(())
 		}
-		pub fn verify_access(
-			acc: T::AccountId, 
-			pallet_name: Vec<u8>,
-		) -> bool { 
-			let role_management = Role { 
-				pallet_name,
-				permission: Permission::Management
-			};
-			let role_executor = Role { 
-				pallet_name,
-				permission: Permission::Executors
-			};
-			let all_roles = Roles::<T>::get();
-
-			let management = Permission::<T>::get((acc, role_management)).ok_or(Error::<T>::Unknown)?;
-			let executor = Permission::<T>::get((acc, role_executor)).ok_or(Error::<T>::Unknown)?;
-			
-			if all_roles.contains(&role_management) && management || all_roles.contains(&role_executor) && executor { 
-				true
-			}
-			false
-
-		}
-	}
-}
-#[derive(Encode, Decode, Clone, Eq, PartialEq)]
-pub struct Authorize<T: Config + Send + Sync>(PhantomData<T>);
-
-/// Debug impl for the `Authorize` struct.
-impl<T: Config + Send + Sync> Debug for Authorize<T> {
-    #[cfg(feature = "std")]
-    fn fmt(&self, f: &mut sp_std::fmt::Formatter) -> sp_std::fmt::Result {
-        write!(f, "Authorize")
-    }
-
-    #[cfg(not(feature = "std"))]
-    fn fmt(&self, _: &mut sp_std::fmt::Formatter) -> sp_std::fmt::Result {
-        Ok(())
-    }
-}
-
-impl<T: Config + Send + Sync> SignedExtension for Authorize<T> where 
-	T::Call: Dispatchable<Info = DispatchInfo> + GetCallMetadata,
-{ 
-	type AccountId = T::AccountId; 
-	// The type which encodes the sender identity 
-	type Call = T::Call;
-	//	the type which encodes the call to be dispatched 
-	type AdditionalSigned = ();
-	//	any additional adata that will go into the signed payload
-    type Pre = ();
-	//	the type that encodes information that can be passed from pre-dispatch to post dispatch
-    const IDENTIFIER: &'static str = "Authorize";
-	//	The unique identifier of this signed extension 
-
-	//	 Construct any additional data that should be in the signed payload of the transaction 
-	//	This will perform anyu pre-signature verification checks and returns and error if needed
-    fn additional_signed(&self) -> sp_std::result::Result<(), TransactionValidityError> {
-        Ok(())
-    }
-
-	//	Validate a signed transaction for the transaction queue
-	fn validate( 
-		&self, 
-		who: &Self::AccountId,
-		call: &Self::Call,
-		info: &DispatchInfoOf<Self::Call>,
-		_len: usize, 
-	) -> TransactionValidity { 
-		let md = call.get_call_metadata();
-		
-		//	Check Transaction Queues for Admin extrinsics, don't filter ones with key access
-		if Admin::<T>::contains_key(who.clone()) { 
-			print!("Access Granted!");
-
-			Ok(ValidTransaction { 
-				priority: info.weight as TransactionPriority,
-				longevity: TransactionLongevity::max_value(),
-				propagate: true, 
-				..Default::default()
-			})
-		} else if Pallet::<T>::verify_access(who.clone(), md.pallet_name.as_bytes.to_vec()) { 
-			print!("Access Granted");
-
-			Ok(ValidTransaction { 
-				priority: info.weight as TransactionPriority,
-				longevity: TransactionLongevity::max_value(),
-				propagate: true, 
-				..Default::default()
-			})
-
-		} else { 
-			print!("Access Denied");
-			Err(InvalidTransaction::Call.into())
-		}
-	}
+	} 	
 }
