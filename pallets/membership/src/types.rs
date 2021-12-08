@@ -5,7 +5,7 @@ use super::*;
 //  Executors can trigger dispatch functions
 #[derive(Clone, Encode, Decode, RuntimeDebug, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub enum Membership { 
+pub enum Permissions { 
     Management,
     Executors, 
 }
@@ -17,26 +17,26 @@ pub enum Executors {
     Buyer, 
 }
 
-impl Membership { 
+impl Permissions { 
     fn as_bytes(&self) -> &[u8] { 
         match self { 
-            Membership::Management => b"Membership::Management",
-            Membership::Executors => b"Membership::Executors",
+            Permissions::Management => b"Permissions::Management",
+            Permissions::Executors => b"Permissions::Executors",
         }
     }
 } 
 
 //  Default values for membership is either an buyer or a seller 
-impl Default for Membership { 
+impl Default for Permissions { 
     fn default() -> Self { 
-        Membership::Executors
+        Permissions::Executors
     }
 }
 
 //  Permissions will set the the user's contraints in other pallets 
 #[derive(Clone, Encode, Decode, RuntimeDebug, PartialEq, Eq)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct Permissions {
+pub struct Role {
     pub pallet_name: Vec<u8>,
-    pub type_member: Membership
+    pub permission: Permissions
 }

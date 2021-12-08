@@ -435,7 +435,7 @@ use super::*;
 			#[pallet::compact] new_payment: T::Balance,
 			#[pallet::compact] frequency: Frequency,
 			#[pallet::compact] name_s: Vec<u8>,
-			#[pallet::compact] freezer: <T as StaticLookup>::Source,
+			#[pallet::compact] freezer: <T::Lookup as StaticLookup>::Source,
 			#[pallet::compact] schedule_periodic_collection: Frequency,
 			#[pallet::compact] collection_portion: Option<Portion>,
 		) -> DispatchResultWithPostInfo { 
@@ -593,7 +593,7 @@ use super::*;
 		pub fn force_cancel_subscription(
 			origin: OriginFor<T>,
 			#[pallet::compact] payment_id: PaymentIndex,
-			subscriber: <T as StaticLookup>::Source
+			subscriber: <T::Lookup as StaticLookup>::Source
 		) -> DispatchResult { 
 			T::ForceOrigin::ensure_signed(origin)?;
 			let subscriber = T::Lookup::lookup(subscriber)?;
@@ -617,7 +617,7 @@ use super::*;
 		#[pallet::weight(10_000)]
 		pub fn force_payment(
 			origin: OriginFor<T>,
-			subscriber: <T as StaticLookup>::Source,
+			subscriber: <T::Lookup as StaticLookup>::Source,
 			#[pallet::compact] payment_id: PaymentIndex,
 			#[pallet::compact] required_payment: T::Balance,
 		) -> DispatchResult { 
