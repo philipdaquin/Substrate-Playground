@@ -189,11 +189,6 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
-[dependencies.pallet-sumstorage]
-default-features = false
-path = '../pallets/sumstorage'
-version = '4.0.0-dev'
-
 [features]
 default = ['std']
 runtime-benchmarks = [
@@ -234,5 +229,4 @@ std = [
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
-    'pallet-sumstorage/std'
 ]

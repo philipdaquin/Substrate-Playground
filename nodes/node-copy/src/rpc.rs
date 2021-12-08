@@ -50,11 +50,5 @@ where
 	// to call into the runtime.
 	// `io.extend_with(YourRpcTrait::to_delegate(YourRpcStruct::new(ReferenceToClient, ...)));`
 
-	//* Add a Silly RPC that returns constant values  */
-	io.extend_with(crate::silly_rpc::SillyRpc::to_delegate(
-		crate::silly_rpc::Silly {},
-	));
-
-
-	io	
+	io
 }

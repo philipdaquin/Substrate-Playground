@@ -78,11 +78,11 @@ use super::*;
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
 
-		//	Versatile Assets 
-		type Assets: 
-		Transfer<Self::AccountId, AssetId = CurrencyId, Balance = Balance>
-		+ Inspect<Self::AccountId, AssetId = CurrencyId, Balance = Balance>
-		+ Mutate<Self::AccountId, AssetId = CurrencyId, Balance = Balance>;
+		// //	Versatile Assets 
+		// type Assets: 
+		// Transfer<Self::AccountId, AssetId = CurrencyId, Balance = Balance>
+		// + Inspect<Self::AccountId, AssetId = CurrencyId, Balance = Balance>
+		// + Mutate<Self::AccountId, AssetId = CurrencyId, Balance = Balance>;
 		
 		// Type used for expressing timestamp.
 		type Moment: AtLeast32Bit + Parameter + Default + Copy + From<u64>;

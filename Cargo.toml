@@ -1,13 +1,14 @@
 [workspace]
 members = [
-    'node',
-    #'pallets/template',
-    'runtime',
-   # 'pallets/compound_interest',
-  # 'pallets/Fixed_points',
+  'node',
+  #'pallets/template',
+  'runtime',
+  #'pallets/compound_interest',
+  #'pallets/Fixed_points',
   #'pallets/ratingsystem'
-  'pallets/recurringpayments',
- # 'pallets/membership',
+  #'pallets/recurringpayments',
+  #'pallets/membership',
+  'pallets/sumstorage',
 ]
 [profile.release]
 panic = 'unwind'
