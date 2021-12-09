@@ -2,8 +2,8 @@
 members = [
 
 # --- NODEs ---
-  #'node',
-  'Custom_Nodes/proof_of_work',
+  'node',
+  #'Custom_Nodes/proof_of_work',
 
 
 # --- RUNTIMEs ---
@@ -14,7 +14,7 @@ members = [
       #'pallets/compound_interest',
       #'pallets/Fixed_points',
       #'pallets/ratingsystem'
-      #'pallets/recurringpayments',
+      'pallets/recurringpayments',
       #'pallets/membership',
       #'pallets/sumstorage',
       #'pallets/sumstorage/rpc',
@@ -22,7 +22,7 @@ members = [
       #'pallets/sumstorage',
 
 # --- CONSENSUS ---
- 'consensus/pow',
+ #'consensus/pow',
 ]
 [profile.release]
 panic = 'unwind'

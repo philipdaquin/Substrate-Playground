@@ -37,7 +37,7 @@ pub enum Executors {
 }
 
 impl Permissions { 
-    fn as_bytes(&self) -> &[u8] { 
+    pub(super) fn as_bytes(&self) -> &[u8] { 
         match self { 
             Permissions::Management => b"Permissions::Management",
             Permissions::Executors => b"Permissions::Executors",

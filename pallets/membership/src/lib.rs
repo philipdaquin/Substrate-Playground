@@ -20,11 +20,13 @@
 //! Functions for the Permissioned Membership pallet.
 
 use std::marker::PhantomData;
-use scale_info::{StaticTypeInfo, TypeInfo};
 use codec::{Encode, Decode, Codec};
-use frame_support::{dispatch::{GetCallMetadata, DispatchInfo, Dispatchable, TransactionPriority}, unsigned::{TransactionValidityError, TransactionValidity}, pallet_prelude::{ValidTransaction, TransactionLongevity, InvalidTransaction}};
+use frame_support::{dispatch::{GetCallMetadata, DispatchInfo, Dispatchable, TransactionPriority}, 
+	unsigned::{TransactionValidityError, TransactionValidity}, 
+	pallet_prelude::{ValidTransaction, TransactionLongevity, InvalidTransaction},
+	traits::{Time}};
 pub use pallet::*;
-use sp_runtime::traits::{SignedExtension, DispatchInfoOf, SignedExtensionMetadata};
+use sp_runtime::traits::{ DispatchInfoOf, SignedExtensionMetadata};
 
 mod types;
 use crate::types::*;
@@ -64,6 +66,8 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 		type Moment: AtLeast32Bit + Parameter + Default + Copy + From<u64>;
 		//	force Orign 
 		type ForceOrigin: EnsureOrigin<Self::Origin>;
+		
+	
 	}
 	pub type AccountId<T> = <T as frame_system::Config>::AccountId;
 
@@ -182,7 +186,7 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 			permission: Permissions,
 			new_member: <T::Lookup as StaticLookup>::Source
 		) -> DispatchResult {
-			T::AddOrigin::ensure_signed(origin)?;
+			T::AddOrigin::ensure_origin(origin)?;
 
 			let new_member = T::Lookup::lookup(new_member)?;
 			//	Role specified for a new_user 
@@ -191,9 +195,9 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 				permission,
 			};
 
-			ensure!(!Self::do_add_role(&role), Error::<T>::RoleAlreadyExists);
+			ensure!(!Self::do_add_role(role), Error::<T>::RoleAlreadyExists);
 			//	Added a role for a Member
-			Permissions::<T>::insert((new_member, role.clone(), true));
+			Permission::<T>::insert((new_member, role.clone()), true);
 
 			Self::deposit_event(Event::RolesCreated { 
 				who: new_member,
@@ -211,14 +215,14 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 			role: Role,
 		) -> DispatchResult { 
 			let sender = ensure_signed(origin)?;
-			let acc = T::Lookup::lookup(origin)?;
+			let acc = T::Lookup::lookup(acc)?;
 			
 			ensure!(
 				!Self::verify_manage_access(role.pallet_name.clone(), acc), 
 				Error::<T>::UnAuthorisedCall
 			);
 
-			Permissions::<T>::insert((acc.clone(), role.clone()), true);
+			Permission::<T>::insert((acc.clone(), role.clone()), true);
 			Self::deposit_event(Event::AccessGranted { 
 				who: acc,
 				pallet_name: role.pallet_name,
@@ -235,13 +239,14 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 			role: Role, 
 		) -> DispatchResult { 
 			let sender = ensure_signed(origin)?;
+			let acc = T::Lookup::lookup(acc)?;
 			//	Check if the user has Management Permission 
 			ensure!(
 				!Self::verify_manage_access(role.pallet_name.clone(), acc), 
 				Error::<T>::UnAuthorisedCall
 			);
 			//	Remove acc from Permissions storage 
-			Permissions::<T>::remove((acc.clone(), role.clone()));
+			Permission::<T>::remove((acc.clone(), role.clone()));
 			Self::deposit_event(Event::RevokeUserAccess { 
 				who: acc, 
 				pallet_name: role.pallet_name,
@@ -257,11 +262,9 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 			acc: <T::Lookup as StaticLookup>::Source
 		) -> DispatchResult { 
 			T::ForceOrigin::ensure_origin(origin)?;
+			let acc = T::Lookup::lookup(acc)?;
 
-			Admin::<T>::insert(
-				T::Lookup::lookup(acc),
-				true
-			);
+			Admin::<T>::insert(	acc, true );
 			Self::deposit_event(Event::AdminAdded { 
 				who: acc
 			});

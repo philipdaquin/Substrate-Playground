@@ -16,25 +16,28 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use scale_info::{StaticTypeInfo, TypeInfo};
 
-//! Functions for the Permissioned Membership pallet.
+// Functions for the Permissioned Membership pallet.
+use sp_runtime::traits::SignedExtension;
+
 use super::*;
 use crate::types::*;
 
 impl<T: Config> Pallet<T> { 
-    fn do_add_role(
+    pub(super) fn do_add_role(
         role: Role,
     ) -> bool { 
-        let all_roles = Role::<T>::get();
+        let all_roles = Roles::<T>::get();
         
         if all_roles.contains(&role) { 
-            false
+           return  false
         }
-        Role::append(role.clone());
+        Roles::<T>::append(role.clone());
         true 
 
     }
-    fn verify_manage_access(
+    pub(super) fn verify_manage_access(
         pallet_name: Vec<u8>,
         acc: T::AccountId, 
     ) -> bool { 
@@ -43,8 +46,8 @@ impl<T: Config> Pallet<T> {
             pallet_name,
             permission: Permissions::Management
         };
-        if all_roles.contains(role.clone) && Permissions::<T>::get((acc, role.clone() )) { 
-            true
+        if all_roles.contains(&role) && Permission::<T>::get((acc, role.clone() )) { 
+            return true
         }
         false
     }
@@ -54,26 +57,26 @@ impl<T: Config> Pallet<T> {
     ) -> bool { 
         let role_management = Role { 
             pallet_name,
-            permission: Permission::Management
+            permission: Permissions::Management
         };
         let role_executor = Role { 
             pallet_name,
-            permission: Permission::Executors
+            permission: Permissions::Executors
         };
         let all_roles = Roles::<T>::get();
 
-        let management = Permission::<T>::get((acc, role_management)).ok_or(Error::<T>::Unknown)?;
-        let executor = Permission::<T>::get((acc, role_executor)).ok_or(Error::<T>::Unknown)?;
+        let management = Permission::<T>::get((acc, role_management));
+        let executor = Permission::<T>::get((acc, role_executor));
         
         if all_roles.contains(&role_management) && management || all_roles.contains(&role_executor) && executor { 
-            true
+            return true
         }
         false
     }
 }
 
 // Signed Transactions 
-#[derive(Encode, Decode, Clone, Eq, PartialEq)]
+#[derive(Encode, Decode, Clone, Eq, PartialEq, scale_info::TypeInfo)]
 pub struct Authorize<T: Config + Send + Sync>(PhantomData<T>);
 
 /// Debug impl for the `Authorize` struct.
@@ -89,8 +92,9 @@ impl<T: Config + Send + Sync> Debug for Authorize<T> {
     }
 }
 
+
 impl<T: Config + Send + Sync> SignedExtension for Authorize<T> where 
-	T::Call: Dispatchable<Info = DispatchInfo> + GetCallMetadata,
+	T::Call: Dispatchable<Info = DispatchInfo> + GetCallMetadata, T: scale_info::TypeInfo
 { 
 	type AccountId = T::AccountId; 
 	// The type which encodes the sender identity 
@@ -131,7 +135,7 @@ impl<T: Config + Send + Sync> SignedExtension for Authorize<T> where
 				..Default::default()
 			})
 		//	Check if Signed Transactions have Verified Access 
-		} else if Pallet::<T>::verify_access(who.clone(), md.pallet_name.as_bytes.to_vec()) { 
+		} else if Pallet::<T>::verify_access(who.clone(), md.pallet_name.as_bytes().to_vec()) { 
 			print!("Access Granted");
 
 			Ok(ValidTransaction { 
