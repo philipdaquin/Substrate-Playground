@@ -24,25 +24,23 @@ use codec::{Encode, Decode, Codec};
 use frame_support::{dispatch::{GetCallMetadata, DispatchInfo, Dispatchable, TransactionPriority}, 
 	unsigned::{TransactionValidityError, TransactionValidity}, 
 	pallet_prelude::{ValidTransaction, TransactionLongevity, InvalidTransaction},
-	traits::{Time}};
+	traits::{UnixTime}};
 pub use pallet::*;
 use sp_runtime::traits::{ DispatchInfoOf, SignedExtensionMetadata};
-
+use sp_runtime::traits::SignedExtension;
 mod types;
-use crate::types::*;
+pub use crate::types::*;
 mod functions;
-use crate::functions::*;
 
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 use sp_std::fmt::Debug;
 
-
 #[frame_support::pallet]
 pub mod pallet {
 	
 use sp_runtime::traits::{AtLeast32Bit, StaticLookup};
-use sp_std::collections::btree_set;
+pub type Moment = u64;
 
 use super::*;
 use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{ChangeMembers, InitializeMembers}, Blake2_128Concat};
@@ -66,6 +64,10 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 		type Moment: AtLeast32Bit + Parameter + Default + Copy + From<u64>;
 		//	force Orign 
 		type ForceOrigin: EnsureOrigin<Self::Origin>;
+		type UnixTime: UnixTime;
+	
+		
+	
 		
 	
 	}
@@ -191,19 +193,28 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 			let new_member = T::Lookup::lookup(new_member)?;
 			//	Role specified for a new_user 
 			let role = Role { 
-				pallet_name, 
-				permission,
+				pallet_name: pallet_name.clone(), 
+				permission: permission.clone(),
 			};
 
 			ensure!(!Self::do_add_role(role), Error::<T>::RoleAlreadyExists);
 			//	Added a role for a Member
-			Permission::<T>::insert((new_member, role.clone()), true);
+			Permission::<T>::insert(
+				(new_member.clone(), 
+				Role { 
+				pallet_name: pallet_name.clone(), 
+				permission: permission.clone(),
+				}
+			), true);
+
+			let now: T::Moment = (T::UnixTime::now().as_secs() / 60).into();
+
 
 			Self::deposit_event(Event::RolesCreated { 
 				who: new_member,
 				pallet_name,
 				permission: permission.as_bytes().to_vec(),
-				now: T::Moment::now(),
+				now,
 			});
 
 			Ok(())
@@ -215,19 +226,20 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 			role: Role,
 		) -> DispatchResult { 
 			let sender = ensure_signed(origin)?;
-			let acc = T::Lookup::lookup(acc)?;
+			let new = T::Lookup::lookup(acc)?;
 			
 			ensure!(
-				!Self::verify_manage_access(role.pallet_name.clone(), acc), 
+				!Self::verify_manage_access(role.pallet_name.clone(), new.clone()), 
 				Error::<T>::UnAuthorisedCall
 			);
-
-			Permission::<T>::insert((acc.clone(), role.clone()), true);
+			let now: T::Moment = (T::UnixTime::now().as_secs() / 60).into();
+			//let time: T::Moment = T::Time::now().into();
+			Permission::<T>::insert((new.clone(), role.clone()), true);
 			Self::deposit_event(Event::AccessGranted { 
-				who: acc,
+				who: new,
 				pallet_name: role.pallet_name,
 				permission: Permissions::Management,
-				now: T::Moment::now()
+				now,
 			});
 
 			Ok(())
@@ -239,18 +251,20 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 			role: Role, 
 		) -> DispatchResult { 
 			let sender = ensure_signed(origin)?;
-			let acc = T::Lookup::lookup(acc)?;
+			let new = T::Lookup::lookup(acc)?;
 			//	Check if the user has Management Permission 
 			ensure!(
-				!Self::verify_manage_access(role.pallet_name.clone(), acc), 
+				!Self::verify_manage_access(role.pallet_name.clone(), new.clone()), 
 				Error::<T>::UnAuthorisedCall
 			);
+
+			let now: T::Moment = (T::UnixTime::now().as_secs() / 60).into();
 			//	Remove acc from Permissions storage 
-			Permission::<T>::remove((acc.clone(), role.clone()));
+			Permission::<T>::remove((new.clone(), role.clone()));
 			Self::deposit_event(Event::RevokeUserAccess { 
-				who: acc, 
+				who: new, 
 				pallet_name: role.pallet_name,
-				now: T::Moment::now()
+				now
 			});
 
 
@@ -264,7 +278,7 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 			T::ForceOrigin::ensure_origin(origin)?;
 			let acc = T::Lookup::lookup(acc)?;
 
-			Admin::<T>::insert(	acc, true );
+			Admin::<T>::insert(	&acc, true );
 			Self::deposit_event(Event::AdminAdded { 
 				who: acc
 			});
@@ -285,10 +299,11 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 				.ok_or(Error::<T>::MemberAlreadyExists)?;
 			members.insert(location_member, new_member.clone());
 
+			let now: T::Moment = (T::UnixTime::now().as_secs() / 60).into();
 			Member::<T>::put(&members);
 			Self::deposit_event(Event::MemberAdded { 
 				who: new_member,
-				now: T::Moment::now()
+				now
 			});
 			Ok(())
 		}
@@ -308,4 +323,131 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 			Ok(())
 		}
 	} 	
+	impl<T: Config> Pallet<T> { 
+		pub(crate) fn do_add_role(
+			role: Role,
+		) -> bool { 
+			let all_roles = Roles::<T>::get();
+			
+			if all_roles.contains(&role) { 
+			   return  false
+			}
+			Roles::<T>::append(role.clone());
+			true 
+	
+		}
+		pub(super) fn verify_manage_access(
+			pallet_name: Vec<u8>,
+			acc: T::AccountId, 
+		) -> bool { 
+			let all_roles = Roles::<T>::get();
+			let role = Role { 
+				pallet_name,
+				permission: Permissions::Management
+			};
+			if all_roles.contains(&role) && Permission::<T>::get((acc, role.clone() )) { 
+				return true
+			}
+			false
+		}
+		pub fn verify_access(
+			acc: T::AccountId, 
+			pallet_name: Vec<u8>,
+		) -> bool { 
+			let role_management = Role { 
+				pallet_name: pallet_name.clone(),
+				permission: Permissions::Management
+			};
+			let role_executor = Role { 
+				pallet_name: pallet_name.clone(),
+				permission: Permissions::Executors
+			};
+			let all_roles = Roles::<T>::get();
+	
+			let management = Permission::<T>::get((acc.clone(), role_management.clone()));
+			let executor = Permission::<T>::get((acc.clone(), role_executor.clone()));
+			
+			if all_roles.contains(&role_management) && management || all_roles.contains(&role_executor) && executor { 
+				return true
+			}
+			return  false
+		}
+	}
+	
+	// Signed Transactions 
+	#[derive(Encode, Decode, Clone, Eq, PartialEq, scale_info::TypeInfo)]
+	pub struct Authorize<T: Config + Send + Sync>(PhantomData<T>);
+	
+	/// Debug impl for the `Authorize` struct.
+	impl<T: Config + Send + Sync> Debug for Authorize<T> {
+		#[cfg(feature = "std")]
+		fn fmt(&self, f: &mut sp_std::fmt::Formatter) -> sp_std::fmt::Result {
+			write!(f, "Authorize")
+		}
+	
+		#[cfg(not(feature = "std"))]
+		fn fmt(&self, _: &mut sp_std::fmt::Formatter) -> sp_std::fmt::Result {
+			Ok(())
+		}
+	}
+	
+	
+	impl<T: Config + Send + Sync> SignedExtension for Authorize<T> where 
+		T::Call: Dispatchable<Info = DispatchInfo> + GetCallMetadata, T: scale_info::TypeInfo
+	{ 
+		type AccountId = T::AccountId; 
+		// The type which encodes the sender identity 
+		type Call = T::Call;
+		//	the type which encodes the call to be dispatched 
+		type AdditionalSigned = ();
+		//	any additional adata that will go into the signed payload
+		type Pre = ();
+		//	the type that encodes information that can be passed from pre-dispatch to post dispatch
+		const IDENTIFIER: &'static str = "Authorize";
+		//	The unique identifier of this signed extension 
+	
+		//	 Construct any additional data that should be in the signed payload of the transaction 
+		//	This will perform anyu pre-signature verification checks and returns and error if needed
+		fn additional_signed(&self) -> sp_std::result::Result<(), TransactionValidityError> {
+			Ok(())
+		}
+	
+		//	Validate a signed transaction for the transaction queue
+		fn validate( 
+			&self, 
+			who: &Self::AccountId,
+			call: &Self::Call,
+			info: &DispatchInfoOf<Self::Call>,
+			_len: usize, 
+		) -> TransactionValidity { 
+			let md = call.get_call_metadata();
+			
+			//	Check Transaction Queues for Admin extrinsics, don't filter ones with key access
+			//	Check if Signed Transactions ahve Admin Keys 
+			if Admin::<T>::contains_key(who.clone()) { 
+				print!("Access Granted!");
+	
+				Ok(ValidTransaction { 
+					priority: info.weight as TransactionPriority,
+					longevity: TransactionLongevity::max_value(),
+					propagate: true, 
+					..Default::default()
+				})
+			//	Check if Signed Transactions have Verified Access 
+			} else if Pallet::<T>::verify_access(who.clone(), md.pallet_name.as_bytes().to_vec()) { 
+				print!("Access Granted");
+	
+				Ok(ValidTransaction { 
+					priority: info.weight as TransactionPriority,
+					longevity: TransactionLongevity::max_value(),
+					propagate: true, 
+					..Default::default()
+				})
+	
+			} else { 
+				print!("Access Denied");
+				Err(InvalidTransaction::Call.into())
+			}
+		}
+	}
 }

@@ -19,17 +19,18 @@
 
 use codec::{Encode, Decode};
 use frame_support::RuntimeDebug;
+use scale_info::TypeInfo;
 
 use super::*;
 //  Executors can trigger dispatch functions
-#[derive(Clone, Encode, Decode, RuntimeDebug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, RuntimeDebug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum Permissions { 
     Management,
     Executors, 
 }
 //  Executors are your Buyers and Sellers
-#[derive(Clone, Encode, Decode, RuntimeDebug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, RuntimeDebug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum Executors { 
     Seller,
@@ -53,7 +54,7 @@ impl Default for Permissions {
 }
 
 //  Permissions will set the the user's contraints in other pallets 
-#[derive(Clone, Encode, Decode, RuntimeDebug, PartialEq, Eq)]
+#[derive(Clone, Encode, Decode, RuntimeDebug, PartialEq, Eq, TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct Role {
     pub pallet_name: Vec<u8>,

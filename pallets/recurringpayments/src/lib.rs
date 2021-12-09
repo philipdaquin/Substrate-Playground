@@ -54,7 +54,6 @@ pub type CurrencyId = u32;
 /// Balance of an account.
 pub type Balance = u128;
 pub type Signature = MultiSignature;
-pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 pub type PaymentIndex = u32;
 
 #[frame_support::pallet]
@@ -114,7 +113,7 @@ use super::*;
 
 	pub type SubscriptionIndex = u32; 
 	//pub type AccountId<T> = <T as frame_system::Config>::AccountId;
-	pub type BalanceOf<T> = <<T as Config>::Assets as Inspect<<T as frame_system::Config>::AccountId>>::Balance;
+	pub type BalanceOf<T> = <<T as Config>::Currency as Inspect<<T as frame_system::Config>::AccountId>>::Balance;
 	
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
