@@ -167,6 +167,25 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
+[dependencies.sp-consensus-pow]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-11-1'
+version = '0.10.0-dev'
+
+
+
+[dependencies.sc-consensus-pow]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-11-1'
+version = '0.10.0-dev'
+
+[dependencies.pow]
+pow = { path = '../../consensus/pow'}
+
+rand = { version = "0.8", features = ["small_rng"] }
+sha3 = "0.9"
+
+
 [features]
 default = []
 runtime-benchmarks = ['node-template-runtime/runtime-benchmarks']

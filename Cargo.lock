@@ -4213,6 +4213,17 @@ dependencies = [
 
 [[package]]
 name = "pow"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ec0492ddf6da50f118c74f6777014b3ca53c3ce57300bcdcda1dbab542e6134"
+dependencies = [
+ "bincode",
+ "serde",
+ "sha2 0.8.2",
+]
+
+[[package]]
+name = "pow"
 version = "4.0.0-dev"
 dependencies = [
  "parity-scale-codec",
@@ -4319,11 +4330,13 @@ dependencies = [
  "jsonrpc-core",
  "node-template-runtime",
  "pallet-transaction-payment-rpc",
+ "pow 0.2.0",
  "sc-basic-authorship",
  "sc-cli",
  "sc-client-api",
  "sc-consensus",
  "sc-consensus-aura",
+ "sc-consensus-pow",
  "sc-executor",
  "sc-finality-grandpa",
  "sc-keystore",
@@ -4338,6 +4351,7 @@ dependencies = [
  "sp-blockchain",
  "sp-consensus",
  "sp-consensus-aura",
+ "sp-consensus-pow",
  "sp-core",
  "sp-finality-grandpa",
  "sp-runtime",

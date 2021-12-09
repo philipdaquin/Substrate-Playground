@@ -3,7 +3,7 @@
 use codec::{Encode, Decode};
 use sc_consensus_pow::{Error, PowAlgorithm};
 use sha3::{Digest, Sha3_256};
-use sp_api::ProvideRuntimeApi;
+use sp_api::{ProvideRuntimeApi, HashT};
 use sp_consensus_pow::{DifficultyApi, Seal as RawSeal};
 use sp_core::{H256, U256};
 use sp_runtime::generic::BlockId;
@@ -51,7 +51,6 @@ impl Compute {
 pub struct ShaAlgorithm<T> { 
     client: Arc<T>
 }
-
 impl<T> ShaAlgorithm<T> { 
     pub fn new(client: Arc<T>) -> Self { 
         Self { 
@@ -113,4 +112,52 @@ impl<A: BlockT<Hash = H256>, T> PowAlgorithm<A> for ShaAlgorithm<T>
         }
         Ok(true)
     }
+}
+
+//  Very Simple Implementation of Proof of Work 
+#[derive(Clone)]
+pub struct SimplePoWAlgo;
+
+impl<X: BlockT<Hash = H256>> PowAlgorithm<X> for SimplePoWAlgo { 
+    type Difficulty = U256;
+
+    fn difficulty(&self, parent: X::Hash) -> Result<Self::Difficulty, Error<X>> { 
+        //  Fixed Difficulty at 1_000_000
+        Ok(U256::from(1_000_000))
+
+    }
+    /// prehash: the hash of the block before the pow seal is attached 
+    /// seal: checks whether the work has been done
+    /// difficulty: what diffuclty did the author completed this 
+    /// 
+    fn verify(&self, 
+        parent: &BlockId<X>, 
+        pre_hash: &H256, 
+        pre_digest: Option<&[u8]>,
+        seal: &RawSeal,
+        difficulty: Self::Difficulty
+    ) -> Result<bool, Error<X>> { 
+        //  Check that the seal actually meets the target difficulty 
+        let seal = {
+            if let Ok(seal) = Seal::decode(&mut &seal[..]) { 
+                seal
+            } else { 
+                return Ok(false)
+            }
+        };
+        if !hash_difficulty(&seal.work, difficulty) { 
+            return Ok(false)
+        }
+        let compute = Compute { 
+            difficulty,
+            pre_hash: *pre_hash,
+            nonce: seal.nonce
+        };
+
+        if compute.compute() != seal { 
+            return Ok(false)
+        }
+        Ok(true)
+    }
+
 }
