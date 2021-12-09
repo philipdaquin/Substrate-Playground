@@ -113,8 +113,8 @@ use super::*;
 
 	pub type SubscriptionIndex = u32; 
 	//pub type AccountId<T> = <T as frame_system::Config>::AccountId;
-	pub type BalanceOf<T> = <<T as Config>::Currency as Inspect<<T as frame_system::Config>::AccountId>>::Balance;
-	
+	pub type BalanceOf<T> = <<T as Config>::Currency as Currency<AccountId<T>>>::Balance;
+	pub type AccountId<T> = <T as frame_system::Config>::AccountId;
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
@@ -125,11 +125,11 @@ use super::*;
 
 	#[pallet::storage]
 	#[pallet::getter(fn subscribe)]
-	pub type Subscriptions<T> = StorageMap<
+	pub type Subscriptions<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
-		T::AccountId, 
-		(SubscriptionIndex, Subscription<AccountId, Moment, Balance>),
+		AccountId<T>, 
+		(SubscriptionIndex, Subscription<AccountId<T>, Moment, Balance>),
 		ValueQuery
 	>;
 	#[pallet::storage]
@@ -142,7 +142,7 @@ use super::*;
 		_,
 		Blake2_128Concat,
 		PaymentIndex,
-		PaymentPlan<AccountId, Balance>,
+		PaymentPlan<AccountId<T>, Balance>,
 		ValueQuery
 	>;
 
@@ -288,7 +288,7 @@ use super::*;
 		pub fn create_payment_system(
 			origin: OriginFor<T>, 
 			#[pallet::compact] required_payment: T::Balance,
-			#[pallet::compact] user_frequency: Frequency,
+			user_frequency: Frequency,
 			#[pallet::compact] name: Vec<u8>,
 			#[pallet::compact] freezer: Option<T::AccountId>,
 			#[pallet::compact] schedule_periodic_collection: Frequency,

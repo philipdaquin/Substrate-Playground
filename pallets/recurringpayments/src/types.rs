@@ -102,20 +102,20 @@ pub struct Subscription<AccountId, Moment, Balance> {
 }
 //	Custom Methods for Subscruption 
 //	- Calculate the next payment based on start date and frequency of payment plan 
-impl<AccountId, Moment, Balance> Subscription<AccountId, Moment, Balance> { 
-	//	Next payment = Start Date + Frequency in terms of (Monthly , Daily, Monthly etc)
-	pub fn schedule_next_payment(mut self, start: Moment) -> Self { 
-		self.next_payment = self.start + self.frequency_of;
-		self
-	}
-} 
+// impl<AccountId, Moment, Balance> Subscription<AccountId, Moment, Balance> { 
+// 	//	Next payment = Start Date + Frequency in terms of (Monthly , Daily, Monthly etc)
+// 	pub fn schedule_next_payment(mut self, start: Moment) -> Self { 
+// 		self.next_payment = self.start + self.frequency_of;
+// 		self
+// 	}
+// } 
 //	Custom Methods for Payment Plans
 //	- Get frequency of PaymentPlan
-impl<AccountId, Moment> PaymentPlan<AccountId, Moment> { 
-	pub fn frequency(&self) -> Self { 
-		self.frequency
-	}
-}
+// impl<AccountId, Moment> PaymentPlan<AccountId, Moment> { 
+// 	pub fn frequency(&self) -> Self { 
+// 		self.frequency 
+// 	}
+// }
 
 pub const AQUARTER: Percent = Percent::from_percent(25);
 pub const HALF: Percent = Percent::from_percent(50);
