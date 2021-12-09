@@ -8,7 +8,11 @@ members = [
   #'pallets/ratingsystem'
   #'pallets/recurringpayments',
   #'pallets/membership',
-  'pallets/sumstorage',
+  #'pallets/sumstorage',
+  #'pallets/sumstorage/rpc',
+  #'pallets/sumstorage/runtime-api',
+
+ # 'pallets/sumstorage',
 ]
 [profile.release]
 panic = 'unwind'

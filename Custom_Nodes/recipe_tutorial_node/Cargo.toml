@@ -28,6 +28,9 @@ version = '4.0.0-dev'
 [dependencies]
 jsonrpc-core = '18.0.0'
 structopt = '0.3.8'
+jsonrpc-core-client = "18.0.0"
+jsonrpc-derive = "18.0.0"
+
 
 [dependencies.frame-benchmarking]
 git = 'https://github.com/paritytech/substrate.git'
@@ -166,6 +169,11 @@ version = '4.0.0-dev'
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
+
+
+# RPC node for SumStorage 
+sum-storage-rpc = { path = "../../pallets/sumstorage/rpc" }
+
 
 [features]
 default = []

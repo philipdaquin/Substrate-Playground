@@ -33,6 +33,7 @@ pub use frame_support::{
 	},
 	StorageValue,
 };
+
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
 use pallet_transaction_payment::CurrencyAdapter;
@@ -283,22 +284,13 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
-// parameter_types! { 
-// 	pub SubmissionDeposit: Balance = 50 * dollar(DOT);
-// }
+//* --------- */ 
+impl sumstorage::Config for Runtime { 
+	type Event = Event;
+}
 
 
-// impl pallet_recurringpayments::Config for Runtime { 
-// 	type Event = Event;
-// 	//type Assets = ();
-// 	type Currency = Currency;
-// 	type PalletId = PaymentPalletId;
-// 	type Moment = Moment;
-// 	type Balance = Balance;
-// 	type UnixTime = UnixTime;
-// 	type SubmissionDeposit = SubmissionDeposit;
 
-// }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -317,8 +309,7 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
-		// //	Recurring Payments 
-		// RecurringPaymentModule: pallet_recurringpayments,
+		SumStorage: pallet_sumstorage,
 
 		
 	}
@@ -481,6 +472,18 @@ impl_runtime_apis! {
 			TransactionPayment::query_fee_details(uxt, len)
 		}
 	}
+	//* ------------------------------------------------------------------------------ */
+	//	Implement a custom run time api 
+	impl sumstorage_rpc_runtime_api::SumStorageApi<Block> for Runtime {
+        fn get_sum() -> u32 {
+            SumStorage::get_sum()
+        }
+
+
+
+
+
+
 
 	#[cfg(feature = "runtime-benchmarks")]
 	impl frame_benchmarking::Benchmark<Block> for Runtime {

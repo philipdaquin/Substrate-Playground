@@ -71,5 +71,8 @@ pub mod pallet {
 		pub fn get_sum() -> u32 {
 			Thing1::<T>::get() + Thing2::<T>::get()
 		}
+		pub fn get_product() -> u32 { 
+			Thing1::<T>::get() - Thing2::<T>::get()
+		}
 	}
 }
