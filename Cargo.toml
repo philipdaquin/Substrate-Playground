@@ -1,8 +1,16 @@
 [workspace]
 members = [
-  'node',
-  #'pallets/template',
+
+# --- NODEs ---
+  #'node',
+  'Custom_Nodes/proof_of_work',
+
+
+# --- RUNTIMEs ---
   'runtime',
+
+#PALLETS
+   #'pallets/template',
       #'pallets/compound_interest',
       #'pallets/Fixed_points',
       #'pallets/ratingsystem'
@@ -11,8 +19,9 @@ members = [
       #'pallets/sumstorage',
       #'pallets/sumstorage/rpc',
       #'pallets/sumstorage/runtime-api',
-
       #'pallets/sumstorage',
+
+# --- CONSENSUS ---
  'consensus/pow',
 ]
 [profile.release]
