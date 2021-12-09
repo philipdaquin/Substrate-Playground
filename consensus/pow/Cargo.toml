@@ -1,0 +1,50 @@
+[package]
+name = 'pow'
+version = '4.0.0-dev'
+description = 'FRAME pallet template for defining custom runtime logic.'
+authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
+homepage = 'https://substrate.io/'
+edition = '2021'
+license = 'Unlicense'
+publish = false
+repository = 'https://github.com/substrate-developer-hub/substrate-node-template/'
+
+[dependencies.codec]
+default-features = false
+features = ['derive']
+package = 'parity-scale-codec'
+version = '2.0.0'
+
+[dependencies]
+rand = { version = "0.8", features = ["small_rng"] }
+sha3 = "0.9"
+
+# Substrate packages
+[dependencies.sp-runtime]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-11-1'
+version = '4.0.0-dev'
+
+[dependencies.sp-core]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-11-1'
+version = '4.0.0-dev'
+
+[dependencies.sp-api]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-11-1'
+version = '4.0.0-dev'
+
+[dependencies.sp-consensus-pow]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-11-1'
+version = '0.10.0-dev'
+
+
+[dependencies.sc-consensus-pow]
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-11-1'
+version = '0.10.0-dev'
+

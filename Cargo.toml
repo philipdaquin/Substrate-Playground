@@ -3,16 +3,17 @@ members = [
   'node',
   #'pallets/template',
   'runtime',
-  #'pallets/compound_interest',
-  #'pallets/Fixed_points',
-  #'pallets/ratingsystem'
-  #'pallets/recurringpayments',
-  #'pallets/membership',
-  #'pallets/sumstorage',
-  #'pallets/sumstorage/rpc',
-  #'pallets/sumstorage/runtime-api',
+      #'pallets/compound_interest',
+      #'pallets/Fixed_points',
+      #'pallets/ratingsystem'
+      #'pallets/recurringpayments',
+      #'pallets/membership',
+      #'pallets/sumstorage',
+      #'pallets/sumstorage/rpc',
+      #'pallets/sumstorage/runtime-api',
 
- # 'pallets/sumstorage',
+      #'pallets/sumstorage',
+ 'consensus/pow',
 ]
 [profile.release]
 panic = 'unwind'
