@@ -18,7 +18,6 @@ use sp_arithmetic::Percent;
 use codec::{Encode, Decode, MaxEncodedLen};
 use frame_support::{RuntimeDebug, traits::OnTimestampSet};
 use scale_info::TypeInfo;
-use crate::{PaymentIndex, BalanceOf};
 pub type BlockNumber = u32;
 pub type Moment = u64;
 
@@ -88,13 +87,14 @@ pub struct PaymentPlan<AccountId, BalanceOf, BoundedString> {
 	//	Whether the asset is frozen for non-admin transfer
 	pub is_frozen: bool,  
 	//	> Number of subscribers currently 
-	pub schedule_periodic_collection: Frequency,
+	pub schedule_periodic_collection: Option<Frequency>,
 	
 
 }
 //	This will help us track the user's next payment 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, Default)]
 pub struct Subscription<AccountId, BlockNumber, BalanceOf> { 
+	pub id: SubscriptionIndex, 
 	//	The subscriber for payment 
 	pub owner: AccountId,
 	//	start date
@@ -107,8 +107,8 @@ pub struct Subscription<AccountId, BlockNumber, BalanceOf> {
 	pub frequency_of: Frequency,
 	//	How many times the user wants to keep recurring payment on
 	pub num_frequency: Option<u32>,
-	//	Specify which you are subscribed to payment_plan
-	pub subscribed_to: Vec<u8>
+	//	Specify which you are subscribed to payment_plan, paymentIndexes are u32
+	pub subscribed_to: Vec<u32>
 
 }
 
@@ -135,3 +135,4 @@ impl Portion {
 		}
 	}
 }
+

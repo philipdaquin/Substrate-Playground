@@ -23,9 +23,9 @@ use sp_runtime::traits::StaticLookup;
 use frame_support::{ensure, traits::Get};
 use frame_support::{ BoundedVec};
 
+pub(super) use pallet::*;
 use super::*;
 // use pallet::{Store, PaymentInfo, SubscriptionId, SubscriptionIndex, Subscriptions, Pallet, };
 // use crate::types::*;
 // use crate::builder::*;
-
 

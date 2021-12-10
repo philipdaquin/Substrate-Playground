@@ -28,7 +28,7 @@ use sp_runtime::traits::Verify;
 
 use sp_arithmetic::Percent;
 
-use sp_std::convert::TryInto;
+use sp_std::{convert::TryInto, boxed::Box};
 
 use substrate_fixed::types::*;
 
@@ -57,22 +57,23 @@ use crate::types::*;
 mod functions;
 use crate::functions::*;
 
-pub use pallet::*;
+pub use pallet_scheduler::pallet::*;
 
-use pallet_scheduler::Pallet;
+
 
 #[frame_support::pallet]
 pub mod pallet {
 	
-	use frame_support::storage::ChildTriePrefixIterator;
+	use frame_support::{storage::ChildTriePrefixIterator, traits::schedule::{Named as ScheduleNamed, DispatchTime}, dispatch::Dispatchable};
 use frame_system::ensure_root;
+use sp_runtime::traits::CheckedSub;
 
 use super::*;
 	
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: frame_system::Config + pallet_proxy::Config + pallet_scheduler::Config {
-		
+		type Info: Parameter + Dispatchable<Origin = <Self as frame_system::Config>::Origin> + From<Call<Self>>;
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 		
@@ -97,8 +98,13 @@ use super::*;
 		//	The amount to be held on deposit by the depositor of a Payment Plan 
 		//	the create call will be used to create a new fund, a deposit must be made first 
 		type SubmissionDeposit: Get<BalanceOf<Self>>;
-		// Time used for computing time 
-		type UnixTime: UnixTime;
+
+		/// The Scheduler.
+		type Scheduler: ScheduleNamed<Self::BlockNumber, Self::Info, <Self as pallet::Config>::PalletsOrigin>;
+
+		// Overarching type of all pallets origins.
+		type PalletsOrigin: From<frame_system::RawOrigin<Self::AccountId>>;
+
 	}
 	pub type PaymentIndex = u32;
 	pub type SubscriptionIndex = u32; 
@@ -121,7 +127,7 @@ use super::*;
 		_,
 		Blake2_128Concat,
 		AccountId<T>, 
-		(SubscriptionIndex, Subscription<AccountId<T>, BlockNumber<T>, BalanceOf<T>>),
+		Subscription<AccountId<T>, BlockNumber<T>, BalanceOf<T>>,
 		ValueQuery
 	>;
 	#[pallet::storage]
@@ -611,18 +617,15 @@ use super::*;
 		#[pallet::weight(10_000)]
 		pub fn force_payment(
 			origin: OriginFor<T>,
-			subscriber: <T::Lookup as StaticLookup>::Source,
+			subscriber: AccountId<T>,
 			payment_id: PaymentIndex,
 			required_payment: BalanceOf<T>,
 		) -> DispatchResult { 
-			let subscriber = T::Lookup::lookup(subscriber)?;
-			let now = frame_system::Pallet::<T>::block_number();
+			T::ForceOrigin::ensure_origin(origin)?;
 			
-			let admin = T::ForceOrigin::try_origin(origin).err().ok_or(Error::<T>::UnAuthorisedCall)?;
-				
+			let now = frame_system::Pallet::<T>::block_number();				
 			Self::do_force_pay(
 				subscriber,
-				admin,
 				payment_id, 
 				required_payment,
 				Event::RecurringPaymentCancelled { 
@@ -645,7 +648,7 @@ use super::*;
 			origin: OriginFor<T>,
         	payment_id: PaymentIndex, 
         	name: Vec<u8>,
-        	new_owner: AccountId<T>,
+        	new_owner: <T::Lookup as StaticLookup>::Source,
         	min_balance: BalanceOf<T>,
         	frequency: Frequency,
         	freezer: Option<<T::Lookup as StaticLookup>::Source>,
@@ -827,18 +830,18 @@ use super::*;
 			let now = frame_system::Pallet::<T>::block_number();
 			
 			//  Schedule Periodic Collections
-			pallet_scheduler::Pallet::<T>::schedule_named(
-				T::ScheduleOrigin,
-				name,
-				now,
-				Some(schedule_periodic_collection.frequency(), Default::default()),
-				Default::default(),
-				Self::do_collect_payments(
-					merchant,
-					payment_id,
-					collection_portion,
-					event
-				)
+			//	TODO: 'Change maybe_period'
+			T::Scheduler::schedule_named(
+				bounded_name,
+				DispatchTime::At(now),
+				None,
+				63,
+				frame_system::RawOrigin::Root.into(),
+				Call::collect_payments {
+					payment_id, 
+					schedule_periodic_collection, 
+					specified_portion: collection_portion,
+				}.into()
 			);
 	
 			Self::deposit_event(event);
@@ -853,7 +856,7 @@ use super::*;
 		) -> DispatchResult {
 			ensure!(!PaymentInfo::<T>::contains_key(&payment_id), Error::<T>::PaymentPlanDoesNotExist);
 			
-			let mut payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
+			let mut payment_info = PaymentInfo::<T>::get(&payment_id);
 			
 			ensure!(merchant == payment_info.merchant, Error::<T>::UnAuthorisedCall);
 			ensure!(!payment_info.total_deposits.is_zero(), Error::<T>::InsufficientBalance);
@@ -864,15 +867,15 @@ use super::*;
 				let per_deposit = amount.portion();
 				let mut total = payment_info.total_deposits;
 				let mut user_requested_amount: BalanceOf<T> = total.saturating_mul(per_deposit);
-				let mut new_total_deposit_in_storage = total.checked_sub(user_requested_amount).ok_or(ArithmeticError::Underflow)?;
+				let mut new_total_deposit_in_storage = total.checked_sub(&user_requested_amount).ok_or(ArithmeticError::Underflow)?;
 	
 				payment_info.total_deposits = new_total_deposit_in_storage;
 	
 				PaymentInfo::<T>::insert(payment_id, payment_info);
 				 //	Ensure we are not chargin fees when the user decides to collect their payments
-				let _ = T::Currency::resolve_creating( 
+				let _ = <T as pallet::Config>::Currency::resolve_creating( 
 				&payment_info.merchant, 
-				T::Currency::withdraw(
+				<T as pallet::Config>::Currency::withdraw(
 					&Self::fund_account_id(payment_id),
 					user_requested_amount,
 					WithdrawReasons::TRANSFER,
@@ -898,7 +901,7 @@ use super::*;
 			if let Some(check_owner) = maybe_owner { 
 				ensure!(payment_info.merchant == check_owner, Error::<T>::UnAuthorisedCall);
 			}
-			payment_info.merchant = Some(delegate); 
+			payment_info.merchant = delegate; 
 			PaymentInfo::<T>::insert(&payment_id, &payment_info);
 			
 			Self::deposit_event(event);
@@ -910,21 +913,21 @@ use super::*;
 			payment_id: PaymentIndex, 
 			min_payment: BalanceOf<T>,
 			num_frequency: Option<u32>,
-			subscriber: AccountId<T>, 
+			subscriber: AccountId<T>,
 			event_payment_sent: Event<T>,
 			event_sub_created: Event<T>,
 		) -> DispatchResult {
 			
 			ensure!(!PaymentInfo::<T>::contains_key(&payment_id), Error::<T>::PaymentPlanDoesNotExist);
-	
+			
 			//	Access Payment plan information  
-			let mut payment_plan = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
+			let mut payment_plan = PaymentInfo::<T>::get(&payment_id);
 			// ensure the user has enough to supplement for required_payment
 			ensure!(min_payment >= payment_plan.required_payment, Error::<T>::InsufficientBalance); 
 			//	check if the PaymentPlan is Frozen
 			ensure!(!payment_plan.is_frozen, Error::<T>::Frozen);
 			//	else -> Transfer funds into fund_index 
-			T::Currency::transfer(
+			<T as pallet::Config>::Currency::transfer(
 				&subscriber, 
 				&Self::fund_account_id(payment_id),
 				min_payment,
@@ -941,51 +944,56 @@ use super::*;
 	
 			let starting_block = frame_system::Pallet::<T>::block_number();
 			let mut due_date = Self::calculate_next_duedate(starting_block, payment_plan.frequency)?;
-			let mut sub_list: Vec<u8> = vec![];
+			let mut sub_list: Vec<u32> = vec![];
 			
 			sub_list.push(payment_id);
 			
 			let subscriber_id = Self::next_subscriber_id();
-	
-			Subscriptions::<T>::insert(&subscriber, 
-				(&subscriber_id, 
-					Subscription::<AccountId<T>, BlockNumber<T>, BalanceOf<T>> { 
-						owner: subscriber,
-						start: starting_block,
-						required_payment: min_payment,
-						next_payment: due_date,
-						frequency_of: payment_plan.frequency,
-						num_frequency: num_frequency.unwrap_or_default(),
-						subscribed_to: sub_list,
-					}));
+			//	Update Storage Subscriptions 
+			Subscriptions::<T>::insert(
+				subscriber,
+				Subscription { 
+					id: subscriber_id,
+					owner: subscriber.clone(),
+					start: starting_block,
+					required_payment: min_payment,
+					next_payment: due_date,
+					frequency_of: payment_plan.frequency,
+					num_frequency: None, 
+					subscribed_to: sub_list.clone() 					
+				}
+			);
+
 
 			PaymentInfo::<T>::insert(payment_id, &payment_plan);
 			Self::deposit_event(event_payment_sent);
-	
+					
+			//	TODO
+			//* Needs to be Reviewde  */
 			//	Add proxy delegate for the user to allow for scheduled dispatchables
-			pallet_proxy::Pallet::<T>::add_proxy(
-				subscriber, 
-				T::ForceOrigin, 
-				Default::default(), 
-				Zero::zero());
+			// pallet_proxy::Pallet::<T>::add_proxy(
+			// 	OriginFor<T>, 
+			// 	T::ForceOrigin, 
+			// 	Default::default(), 
+			// 	Zero::zero());
 	
 			//	Schedule a dispatchable function based on frequency
 			//	Schedule name is based on the PaymentPlan Name
 			//	This is specified according to the users preference 
-	
-			//	Scheduled for the next Payment which involves reducing num_frequency by 1 until it reaches zero
-			pallet_scheduler::Pallet::<T>::schedule_named(
-				T::ScheduleOrigin,
-				payment_plan.name,
-				&due_date,
-				Some(payment.frequency, num_frequency.unwrap_or_default()),
+			//* Needs to be Reviewed */
+			T::Scheduler::schedule_named(
+				payment_plan.name.to_vec(),
+				DispatchTime::At(due_date),
+				None, 
 				Default::default(),
-				Pallet::<T>::force_payment(
-					T::ForceOrigin, 
-					subscriber, 
-					payment_id
-				)
+				frame_system::RawOrigin::Root.into(),
+				Call::force_payment { 
+					subscriber,
+					payment_id,
+					required_payment: min_payment
+				}.into()
 			);
+			
 			Self::deposit_event(event_sub_created);
 	
 			Ok(())
@@ -1000,7 +1008,7 @@ use super::*;
 	
 			//	Get the users contribution 
 			let balance = Self::get_payment_info(payment_id, &subscriber);
-			let subscriber_info = Subscriptions::<T>::get(&subscriber).ok_or(Error::<T>::Unknown)?;
+			let subscriber_info = Subscriptions::<T>::get(&subscriber);
 			
 			//	Get User's Subscription information 
 			let subscription = subscriber_info.1;
@@ -1023,7 +1031,7 @@ use super::*;
 				
 				// Return funds to caller without charging a transfer fee
 				let _ = <T as pallet::Config>::Currency::resolve_into_existing(&subscriber, 
-					T::Currency::withdraw(
+					<T as pallet::Config>::Currency::withdraw(
 					&Self::fund_account_id(payment_id), 
 						user_refund, 
 						WithdrawReasons::TRANSFER, 
@@ -1033,11 +1041,11 @@ use super::*;
 				Self::deposit_event(event_refund);
 			}
 			//	Remove Proxy inside the user 
-			pallet_proxy::Pallet::<T>::remove_proxies(&subscriber);
+			pallet_proxy::Pallet::<T>::remove_proxies(frame_system::RawOrigin::Root.into());
 			//	Remove schedule dispatchable
 			let payment_info = PaymentInfo::<T>::get(payment_id);
 			
-			pallet_scheduler::Pallet::<T>::cancel_named(subscriber, payment_info.name);
+			pallet_scheduler::Pallet::<T>::cancel_named(frame_system::RawOrigin::Root.into(), payment_info.name);
 			
 			Self::deposit_event(event_cancelled);
 			
@@ -1057,14 +1065,14 @@ use super::*;
 			
 			ensure!(!PaymentInfo::<T>::contains_key(&id), Error::<T>::PaymentPlanDoesNotExist);
 			//	Access Payment Plan Details 
-			let mut payment_info = PaymentInfo::<T>::get(id).ok_or(Error::<T>::Unknown)?;
+			let mut payment_info = PaymentInfo::<T>::get(id);
 			ensure!(payment_info.merchant == seller, Error::<T>::UnAuthorisedCall);
 	
 			let new_name: BoundedVec<u8, T::StringLimit> =
 				name_s.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
 			let freezer = freezer.map(T::Lookup::lookup).transpose()?;
 			
-			let collection: Frequency = schedule_periodic_collection.unwrap_or(payment_info.schedule_periodic_collection)?;
+			let collection: Frequency = schedule_periodic_collection.unwrap_or(payment_info.schedule_periodic_collection);
 			
 			PaymentInfo::<T>::insert(
 				id,
@@ -1093,16 +1101,16 @@ use super::*;
 		) -> DispatchResult { 
 			ensure!(!PaymentInfo::<T>::contains_key(&payment_id), Error::<T>::PaymentPlanDoesNotExist);
 			let now = frame_system::Pallet::<T>::block_number();
-			let payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
+			let payment_info = PaymentInfo::<T>::get(&payment_id);
 			//	Check if the Some(Merchant) is the Owner
 			if let Some(check_owner) = maybe_owner { 
 				ensure!(payment_info.merchant == check_owner, Error::<T>::UnAuthorisedCall);
 			}
 			//	If total deposit is not zero, return to user 
-			if !payment_info.total_deposits == Zero::zero() {
+			if !payment_info.total_deposits.is_zero() {
 				//	Ensure we are not charging fees when the user decides to collect their payments
-				let _ = T::Currency::resolve_creating( 
-					&payment_info.merchant, T::Currency::withdraw(
+				let _ = <T as pallet::Config>::Currency::resolve_creating( 
+					&payment_info.merchant, <T as pallet::Config>::Currency::withdraw(
 						&Self::fund_account_id(payment_id),
 						payment_info.total_deposits,
 						WithdrawReasons::TRANSFER,
@@ -1130,10 +1138,10 @@ use super::*;
 		) -> DispatchResult {
 			ensure!(!PaymentInfo::<T>::contains_key(&payment_id), Error::<T>::PaymentPlanDoesNotExist);
 	
-			let mut payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
+			let mut payment_info = PaymentInfo::<T>::get(&payment_id);
 			
 			if let Some(check_owner) = merchant { 
-				ensure!(payment_info.freezer == check_owner, Error::<T>::UnAuthorisedCall);
+				ensure!(payment_info.freezer == Some(check_owner), Error::<T>::UnAuthorisedCall);
 			}
 			
 			payment_info.is_frozen = true;
@@ -1149,7 +1157,7 @@ use super::*;
 			payment_id: PaymentIndex,
 			event_unfreeze: Event<T>,
 		) -> DispatchResult { 
-			let mut payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
+			let mut payment_info = PaymentInfo::<T>::get(&payment_id);
 			ensure!(!payment_info.is_frozen, Error::<T>::AlreadyUnFrozen);
 	
 			if let Some(check_owner) = maybe_owner { 
@@ -1183,8 +1191,7 @@ use super::*;
 			)
 		}
 		pub(super) fn do_force_pay(
-			subscriber: AccountId<T>,
-			admin: <T as Config>::ForceOrigin, 
+			subscriber: T::AccountId,
 			payment_id: PaymentIndex,
 			required_payment: BalanceOf<T>,
 			event_cancelled: Event<T>,
@@ -1195,27 +1202,27 @@ use super::*;
 			
 			//let admin = T::ForceOrigin::ensure_origin(admin)?;
 			
-			let mut payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
-			let mut subscription_info = Subscriptions::<T>::get(&subscriber).ok_or(Error::<T>::UserDoesNotExist)?;
+			let mut payment_info = PaymentInfo::<T>::get(&payment_id);
+			let mut subscription_info = Subscriptions::<T>::get(&subscriber);
 			let now = frame_system::Pallet::block_number();
 	
 			//  Check if the required payments matches with the users subcription 
-			ensure!(subscription_info.1.required_payment == payment_info.required_payment, Error::<T>::InvalidPayment);
+			ensure!(subscription_info.required_payment == payment_info.required_payment, Error::<T>::InvalidPayment);
 			//	Check if the user is associated with the subscription info 
-			ensure!(subscription_info.1.owner == subscriber, Error::<T>::NotASubscriber);
+			ensure!(subscription_info.owner == subscriber, Error::<T>::NotASubscriber);
 			//	Check how many users are subscribed to this payment plan, if zero, emit error
-			ensure!(payment_info.num_subscribers != Zero::zero(), Error::<T>::NoSubscribersFound);
+			ensure!(!payment_info.num_subscribers.is_zero(), Error::<T>::NoSubscribersFound);
 			//	Check if the payment plan is blocking any transfers
 			ensure!(!payment_info.is_frozen, Error::<T>::Frozen);
 			//	Check if the user is subscribed to the payment plan 
-			ensure!(subscription_info.1.subscribed_to.contains(&payment_id), Error::<T>::UserNotSubscribed);
+			ensure!(subscription_info.subscribed_to.contains(&payment_id), Error::<T>::UserNotSubscribed);
 			//	Check if the user is meant to pay now 
-			ensure!(subscription_info.1.next_payment == now, Error::<T>::NotDueYet);
+			ensure!(subscription_info.next_payment == now, Error::<T>::NotDueYet);
 			//	Get users that are subscribed into this payment plan 
 			
 			//	Force call the user to transfer funds into the child trie
-			let force_call = T::Currency::force_transfer(
-				admin,
+			let force_call = <T as pallet::Config>::Currency::force_transfer(
+				frame_system::RawOrigin::Root.into(),
 				&subscriber, 
 				&Self::fund_account_id(payment_id),
 				subscription_info.required_payment,)?;
@@ -1224,11 +1231,10 @@ use super::*;
 			if force_call.is_err() { 
 				Subscriptions::<T>::remove(subscriber);
 				//	Remove Proxy inside the user 
-				pallet_proxy::Pallet::<T>::remove_proxies(&subscriber);
+				pallet_proxy::Pallet::<T>::remove_proxies(frame_system::RawOrigin::Root.into());
 				//	Remove schedule dispatchable
-				pallet_scheduler::Pallet::<T>::cancel_named(subscriber, payment_info.name);
+				T::Scheduler::cancel_named(payment_info.name).map_err(|_| Error::<T>::PaymentPlanDoesNotExist)?;
 				//  Cancel User Membership
-	
 				Self::deposit_event(event_cancelled);
 	
 			} else { 
@@ -1242,7 +1248,7 @@ use super::*;
 			maybe_owner: Option<AccountId<T>>,
 			payment_id: PaymentIndex, 
 			name: Vec<u8>,
-			new_owner: AccountId<T>,
+			new_owner: <T::Lookup as StaticLookup>::Source,
 			min_balance: BalanceOf<T>,
 			frequency: Frequency,
 			freezer: Option<<T::Lookup as StaticLookup>::Source>,
@@ -1251,23 +1257,24 @@ use super::*;
 			event_edit: Event<T>,
 		) -> DispatchResult {
 			ensure!(!PaymentInfo::<T>::contains_key(&payment_id), Error::<T>::PaymentPlanDoesNotExist);
-			let mut payment_info = PaymentInfo::<T>::get(&payment_id).ok_or(Error::<T>::Unknown)?;
+			let mut payment_info = PaymentInfo::<T>::get(&payment_id);
 			
 			let bounded_name: BoundedVec<u8, T::StringLimit> =
 				name.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
 			let freezer = freezer.map(T::Lookup::lookup).transpose()?;
 	
-			PaymentInfo::<T>::try_mutate(payment_id, |info| { 
-				let mut curr = info.take().ok_or(Error::<T>::Unknown)?;
+			PaymentInfo::<T>::try_mutate_exists(payment_id, |info| { 
+				let mut curr = info.as_mut().ok_or(Error::<T>::Unknown)?;
 				curr.merchant = T::Lookup::lookup(new_owner)?;
 				curr.name = bounded_name;
 				curr.required_payment = min_balance;
 				curr.frequency = frequency;
-				curr.subscribers = Zero::zero();
+				curr.num_subscribers = 0;
 				curr.freezer = freezer;
-				curr.schedule_periodic_collection = schedule_periodic_collection.ok_or(Frequency::None);
+				curr.schedule_periodic_collection = schedule_periodic_collection;
 				curr.is_frozen = is_frozen;
-				*info = Some(curr);
+				
+				*info = Some(curr); 
 	
 				Self::deposit_event(event_edit);
 				Ok(())
