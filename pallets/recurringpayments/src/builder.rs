@@ -30,32 +30,32 @@
 // 	payment_id: PaymentIndex,
 // 	required_payment: Balance,
 // 	total_deposits: Balance,
-// 	frequency: Frequency::None,
+// 	frequency,
 // 	num_subscribers: u32,
 // 	freezer: AccountId,
 // 	is_frozen: bool,
-// 	schedule_periodic_collection: Frequency::None,
+// 	schedule_periodic_collection,
 
 // }
-// //	Set up default values for payment plans -> Set to default values 
-// // impl<AccountId, Balance> Default for PaymentPlanBuilder<AccountId, Balance> 
-// // 	where AccountId: Default, Balance: Default
-// // { 
-// // 	fn default() -> Self { 
-// // 		PaymentPlanBuilder { 
-// // 			merchant: AccountId::default(),
-// // 			name: Self::default(),
-// // 			payment_id: PaymentIndex::default(),
-// // 			required_payment: Zero::zero(),
-// // 			total_deposits: Zero::zero(),
-// // 			frequency: Frequency::None,
-// // 			num_subscribers: Zero::zero(),
-// // 			freezer: AccountId::default(),
-// // 			is_frozen: false,
-// // 			schedule_periodic_collection: Frequency::None
-// // 		}
-// // 	}
-// // }
+// // //	Set up default values for payment plans -> Set to default values 
+// // // impl<AccountId, Balance> Default for PaymentPlanBuilder<AccountId, Balance> 
+// // // 	where AccountId: Default, Balance: Default
+// // // { 
+// // // 	fn default() -> Self { 
+// // // 		PaymentPlanBuilder { 
+// // // 			merchant: AccountId::default(),
+// // // 			name: Self::default(),
+// // // 			payment_id: PaymentIndex::default(),
+// // // 			required_payment: Zero::zero(),
+// // // 			total_deposits: Zero::zero(),
+// // // 			frequency: Frequency::None,
+// // // 			num_subscribers: Zero::zero(),
+// // // 			freezer: AccountId::default(),
+// // // 			is_frozen: false,
+// // // 			schedule_periodic_collection: Frequency::None
+// // // 		}
+// // // 	}
+// // // }
 
 // impl<AccountId, Balance> PaymentPlanBuilder<AccountId, Balance> 
 // 	where AccountId: Default, Balance: Default
@@ -77,7 +77,7 @@
 // 		self
 // 	}
 // 	pub fn new_deposit(mut self, total_deposits: Balance, required_payment: Balance) -> Self { 
-// 		self.total_deposits = self.total_deposits + self.required_payment;
+// 		self.total_deposits = stotal_deposits.saturating_add(required_payment);
 // 		self
 // 	}
 // 	pub fn payment_frequency(mut self, frequency: Frequency) -> Self { 
@@ -120,7 +120,7 @@
 // 	start: Moment, 
 // 	next_payment: Moment, 
 // 	required_payment: Balance,
-// 	frequency_of: Frequency,
+// 	frequency_of,
 // 	num_frequency: u32,
 // 	subscribed_to: Vec<u8>,
 	
@@ -162,7 +162,7 @@
 // 			start: self.start,
 // 			next_payment: self.next_payment,
 // 			required_payment: self.required_payment,
-// 			frequency_of: self.frequency_of,
+// 			frequency_of,
 // 			num_frequency: Some(self.num_frequency),
 // 			subscribed_to: self.subscribed_to,
 // 		}
