@@ -7,15 +7,15 @@ members = [
 
 
 # --- RUNTIMEs ---
-  'runtime',
+  #'runtime',
 
 #PALLETS
    #'pallets/template',
       #'pallets/compound_interest',
       #'pallets/Fixed_points',
       #'pallets/ratingsystem'
-      'pallets/recurringpayments',
-      #'pallets/membership',
+      #'pallets/recurringpayments',
+     'pallets/membership',
       #'pallets/sumstorage',
       #'pallets/sumstorage/rpc',
       #'pallets/sumstorage/runtime-api',

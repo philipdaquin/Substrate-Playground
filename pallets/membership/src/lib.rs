@@ -22,7 +22,7 @@
 use std::marker::PhantomData;
 use codec::{Encode, Decode, Codec};
 use frame_support::{dispatch::{GetCallMetadata, DispatchInfo, Dispatchable, TransactionPriority}, 
-	unsigned::{TransactionValidityError, TransactionValidity}, 
+	unsigned::{TransactionValidityError, TransactionValidity}, print,
 	pallet_prelude::{ValidTransaction, TransactionLongevity, InvalidTransaction},
 	traits::{UnixTime}};
 pub use pallet::*;
@@ -35,6 +35,7 @@ mod functions;
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 use sp_std::fmt::Debug;
+use sp_std::vec::Vec;
 
 #[frame_support::pallet]
 pub mod pallet {

@@ -783,14 +783,7 @@ use super::*;
 			//  Return the due_date for BlockNumber 
 			Ok(due_date)
 		}
-		//	Calculate the portion of funds that have exhausted 
-		pub(super) fn calculate_leftover(
-
-		) -> Result<(), DispatchError>{
-
-			Ok(())
-		}
-
+	
 		pub(super) fn do_create(
 			payment_id: PaymentIndex,
 			name: Vec<u8>,
@@ -1039,12 +1032,12 @@ use super::*;
 			//	if we get a balance, then we refund it back to the user 
 			
 			//	Remove Proxy inside the user 
-			pallet_proxy::Pallet::<T>::remove_proxies(frame_system::RawOrigin::Root.into());
+			pallet_proxy::Pallet::<T>::remove_proxies(frame_system::RawOrigin::Root.into())?;
 			//	Remove schedule dispatchable
 			let payment_info = PaymentInfo::<T>::get(payment_id);
 			
 			pallet_scheduler::Pallet::<T>::cancel_named(frame_system::RawOrigin::Root.into(), 
-				payment_info.name.to_vec());
+				payment_info.name.to_vec())?;
 			
 			Self::deposit_event(event_cancelled);
 			
@@ -1222,11 +1215,14 @@ use super::*;
 			//	This Assumes the Subscriber has delegated Proxy to the Root 
 			//	If the call fails, we remove subscription info, proxy calls, scheduled dispatchables and memberships 
 			if Self::transfer_payment(
-				frame_system::RawOrigin::Root.into(),  T::Lookup::unlookup(subscriber.clone()), payment_id,required_payment,
+				frame_system::RawOrigin::Root.into(),  
+				T::Lookup::unlookup(subscriber.clone()), 
+				payment_id,
+				required_payment,
 			).is_err() { 
 				Subscriptions::<T>::remove(subscriber.clone());
 				//	Remove Proxy inside the user 
-				pallet_proxy::Pallet::<T>::remove_proxies(frame_system::RawOrigin::Root.into());
+				pallet_proxy::Pallet::<T>::remove_proxies(frame_system::RawOrigin::Root.into())?;
 				//	Remove schedule dispatchable
 				T::Scheduler::cancel_named(payment_info.name.to_vec()).map_err(|_| Error::<T>::PaymentPlanDoesNotExist)?;
 				//  Cancel User Membership
