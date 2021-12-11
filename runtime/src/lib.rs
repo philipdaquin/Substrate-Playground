@@ -6,54 +6,17 @@
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
-/// Wasm binary unwrapped. If built with `SKIP_WASM_BUILD`, the function panics.
-#[cfg(feature = "std")]
-pub fn wasm_binary_unwrap() -> &'static [u8] {
-	WASM_BINARY.expect(
-		"Development wasm binary is not available. This means the client is built with \
-		 `SKIP_WASM_BUILD` flag and it is only usable for production chains. Please rebuild with \
-		 the flag disabled.",
-	)
-}
-
-
-
-use frame_benchmarking::baseline::mock::OriginCaller;
-use frame_support::PalletId;
 use pallet_grandpa::{
 	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
-};
-use frame_support::{
-	construct_runtime, parameter_types,
-	traits::{
-		ConstU128, ConstU32, Currency, EnsureOneOf, EqualPrivilegeOnly, Everything, Imbalance,
-		InstanceFilter, KeyOwnerProofSystem, LockIdentifier, Nothing, OnUnbalanced,
-		U128CurrencyToVote,
-	},
-	weights::{
-		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
-		DispatchClass, IdentityFee, Weight,
-	},
-	PalletId, RuntimeDebug,
-};
-use frame_system::{
-	limits::{BlockLength, BlockWeights},
-	EnsureRoot,
 };
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
-use sp_inherents::{CheckInherentsResult, InherentData};
 use sp_runtime::{
-	create_runtime_str,
-	curve::PiecewiseLinear,
-	generic, impl_opaque_keys,
-	traits::{
-		self, BlakeTwo256, Block as BlockT, ConvertInto, NumberFor, OpaqueKeys,
-		SaturatedConversion, StaticLookup,
-	},
-	transaction_validity::{TransactionPriority, TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, FixedPointNumber, Perbill, Percent, Permill, Perquintill,
+	create_runtime_str, generic, impl_opaque_keys,
+	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, Verify},
+	transaction_validity::{TransactionSource, TransactionValidity},
+	ApplyExtrinsicResult, MultiSignature,
 };
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
@@ -77,17 +40,8 @@ use pallet_transaction_payment::CurrencyAdapter;
 pub use sp_runtime::BuildStorage;
 pub use sp_runtime::{Perbill, Permill};
 
-// pub use pallet_recurringpayments;
-// use runtime_common::
-
-/// ====> Start here <===========
 /// Import the template pallet.
 pub use pallet_template;
-pub use pallet_recurringpayments;
-pub use pallet_proxy;
-pub use pallet_scheduler;
-pub use pallet_collective;
-// 
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -156,7 +110,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 /// up by `pallet_aura` to implement `fn slot_duration()`.
 ///
 /// Change this to adjust the block time.
-pub const MILLISECS_PER_BLOCK: u64 = 3000;
+pub const MILLISECS_PER_BLOCK: u64 = 6000;
 
 // NOTE: Currently it is not possible to change the slot duration after the chain has started.
 //       Attempting to do so will brick block production.
@@ -238,10 +192,9 @@ impl frame_system::Config for Runtime {
 	/// The set code logic, just the default since we're not a parachain.
 	type OnSetCode = ();
 }
-/// ------------------------> Runtime Implementation <-------------------------------- ///
+
 impl pallet_randomness_collective_flip::Config for Runtime {}
 
-//	--------------------Pallet Aura---------------//	
 parameter_types! {
 	pub const MaxAuthorities: u32 = 32;
 }
@@ -251,7 +204,6 @@ impl pallet_aura::Config for Runtime {
 	type DisabledValidators = ();
 	type MaxAuthorities = MaxAuthorities;
 }
-//	-----------------GrandPa-----------------//
 
 impl pallet_grandpa::Config for Runtime {
 	type Event = Event;
@@ -276,7 +228,6 @@ impl pallet_grandpa::Config for Runtime {
 parameter_types! {
 	pub const MinimumPeriod: u64 = SLOT_DURATION / 2;
 }
-//	 ------------------------------------------//
 
 impl pallet_timestamp::Config for Runtime {
 	/// A timestamp: milliseconds since the unix epoch.
@@ -328,154 +279,6 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
-type EnsureRootOrHalfCouncil = EnsureOneOf<
-	EnsureRoot<AccountId>,
-	pallet_collective::EnsureProportionMoreThan<_1, _2, AccountId, CouncilCollective>,
->;
-
-// =============> Pallet Recurring Payments Traits <=============// 
-parameter_types! {
-	pub const RecurringPaymentPalletId: PalletId = PalletId(b"PaymentSystem"); 
-	pub const StringLimit: u32 = 50;
-
-}
-
-impl pallet_recurringpayments::Config for Runtime { 
-	type Event = Event; 
-	type Currency = Balances;
-	type Moment = u64;
-	type Info = Call;
-	type ForceOrigin = EnsureRootOrHalfCouncil;
-	type SubmissionDeposit = SubmissionDeposit;
-	type PalletsOrigin = OriginCaller;
-	type Scheduler = EnsureRoot<AccountId>;
-	type ForceOrigin = EnsureRootOrHalfCouncil;
-	type Moment = Moment;
-
-}
-
-// ===============> Pallet Proxy <=====================//
-parameter_types! {
-	// One storage item; key size 32, value size 8; .
-	pub const ProxyDepositBase: Balance = deposit(1, 8);
-	// Additional storage item size of 33 bytes.
-	pub const ProxyDepositFactor: Balance = deposit(0, 33);
-	pub const MaxProxies: u16 = 32;
-	pub const AnnouncementDepositBase: Balance = deposit(1, 8);
-	pub const AnnouncementDepositFactor: Balance = deposit(0, 66);
-	pub const MaxPending: u16 = 32;
-}
-
-/// The type used to represent the kinds of proxying allowed.
-#[derive(
-	Copy,
-	Clone,
-	Eq,
-	PartialEq,
-	Ord,
-	PartialOrd,
-	Encode,
-	Decode,
-	RuntimeDebug,
-	MaxEncodedLen,
-	scale_info::TypeInfo,
-)]
-pub enum ProxyType {
-	Any,
-	NonTransfer,
-	Governance,
-	Staking,
-}
-impl Default for ProxyType {
-	fn default() -> Self {
-		Self::Any
-	}
-}
-impl InstanceFilter<Call> for ProxyType {
-	fn filter(&self, c: &Call) -> bool {
-		match self {
-			ProxyType::Any => true,
-			ProxyType::NonTransfer => !matches!(
-				c,
-				Call::Balances(..) |
-					Call::Assets(..) | Call::Uniques(..) |
-					Call::Vesting(pallet_vesting::Call::vested_transfer { .. }) |
-					Call::Indices(pallet_indices::Call::transfer { .. })
-			),
-			ProxyType::Governance => matches!(
-				c,
-				Call::Democracy(..) |
-					Call::Council(..) | Call::Society(..) |
-					Call::TechnicalCommittee(..) |
-					Call::Elections(..) | Call::Treasury(..)
-			),
-			ProxyType::Staking => matches!(c, Call::Staking(..)),
-		}
-	}
-	fn is_superset(&self, o: &Self) -> bool {
-		match (self, o) {
-			(x, y) if x == y => true,
-			(ProxyType::Any, _) => true,
-			(_, ProxyType::Any) => false,
-			(ProxyType::NonTransfer, _) => true,
-			_ => false,
-		}
-	}
-}
-
-impl pallet_proxy::Config for Runtime {
-	type Event = Event;
-	type Call = Call;
-	type Currency = Balances;
-	type ProxyType = ProxyType;
-	type ProxyDepositBase = ProxyDepositBase;
-	type ProxyDepositFactor = ProxyDepositFactor;
-	type MaxProxies = MaxProxies;
-	type WeightInfo = pallet_proxy::weights::SubstrateWeight<Runtime>;
-	type MaxPending = MaxPending;
-	type CallHasher = BlakeTwo256;
-	type AnnouncementDepositBase = AnnouncementDepositBase;
-	type AnnouncementDepositFactor = AnnouncementDepositFactor;
-}
-// ====================> Pallet Scheduler <======================= //
-parameter_types! {
-	pub MaximumSchedulerWeight: Weight = Perbill::from_percent(80) *
-		RuntimeBlockWeights::get().max_block;
-	pub const MaxScheduledPerBlock: u32 = 50;
-}
-
-impl pallet_scheduler::Config for Runtime {
-	type Event = Event;
-	type Origin = Origin;
-	type PalletsOrigin = OriginCaller;
-	type Call = Call;
-	type MaximumWeight = MaximumSchedulerWeight;
-	type ScheduleOrigin = EnsureRoot<AccountId>;
-	type MaxScheduledPerBlock = MaxScheduledPerBlock;
-	type WeightInfo = pallet_scheduler::weights::SubstrateWeight<Runtime>;
-	type OriginPrivilegeCmp = EqualPrivilegeOnly;
-	
-//	========================> Pallet Collective <==================// 
-parameter_types! {
-	pub const CouncilMotionDuration: BlockNumber = 5 * DAYS;
-	pub const CouncilMaxProposals: u32 = 100;
-	pub const CouncilMaxMembers: u32 = 100;
-}
-
-type CouncilCollective = pallet_collective::Instance1;
-impl pallet_collective::Config<CouncilCollective> for Runtime {
-	type Origin = Origin;
-	type Proposal = Call;
-	type Event = Event;
-	type MotionDuration = CouncilMotionDuration;
-	type MaxProposals = CouncilMaxProposals;
-	type MaxMembers = CouncilMaxMembers;
-	type DefaultVote = pallet_collective::PrimeDefaultVote;
-	type WeightInfo = pallet_collective::weights::SubstrateWeight<Runtime>;
-}
-
-// =========================> END OF PALLET CONFIGURATION <==============================// 
-
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime where
@@ -493,15 +296,6 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
-		
-		
-		// ============> Our Pallets <=============
-		RecurringPaymentModule: pallet_recurringpayments,
-		Proxy: pallet_proxy,
-		Scheduler: pallet_scheduler,
-		Collective: pallet_collective,
-
-		
 	}
 );
 
@@ -529,10 +323,8 @@ pub type Executive = frame_executive::Executive<
 	Block,
 	frame_system::ChainContext<Runtime>,
 	Runtime,
-	AllPalletsWithSystem,
+	AllPallets,
 >;
-
-///	==============================> Runtime APIs <===================================//
 
 impl_runtime_apis! {
 	impl sp_api::Core<Block> for Runtime {

@@ -33,7 +33,7 @@ use sp_arithmetic::Percent;
 
 use sp_std::{convert::TryInto, boxed::Box};
 
-use substrate_fixed::types::*;
+//use substrate_fixed::types::*;
 
 use codec::{Decode, Encode, HasCompact};
 use frame_support::{pallet_prelude::*, ensure, storage::child, PalletId,
@@ -1032,7 +1032,7 @@ use super::*;
 			//	if we get a balance, then we refund it back to the user 
 			
 			//	Remove Proxy inside the user 
-			pallet_proxy::Pallet::<T>::remove_proxies(frame_system::RawOrigin::Root.into())?;
+			pallet_proxy::Pallet::<T>::remove_proxies(frame_system::RawOrigin::Root.into());
 			//	Remove schedule dispatchable
 			let payment_info = PaymentInfo::<T>::get(payment_id);
 			
@@ -1222,9 +1222,9 @@ use super::*;
 			).is_err() { 
 				Subscriptions::<T>::remove(subscriber.clone());
 				//	Remove Proxy inside the user 
-				pallet_proxy::Pallet::<T>::remove_proxies(frame_system::RawOrigin::Root.into())?;
+				pallet_proxy::Pallet::<T>::remove_proxies(frame_system::RawOrigin::Root.into());
 				//	Remove schedule dispatchable
-				T::Scheduler::cancel_named(payment_info.name.to_vec()).map_err(|_| Error::<T>::PaymentPlanDoesNotExist)?;
+				T::Scheduler::cancel_named(payment_info.name.to_vec()).map_err(|_| Error::<T>::PaymentPlanDoesNotExist);
 				//  Cancel User Membership
 				Self::deposit_event(event_cancelled);
 				
@@ -1355,9 +1355,6 @@ use super::*;
 
 			Ok(curr_balance * remaining_ratio.into())
 
-		}
-		fn percentage() -> I32F32 { 
-			I32F32::from_num(1)
 		}
 	}
 }
