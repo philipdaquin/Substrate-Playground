@@ -22,6 +22,7 @@ pub type BlockNumber = u32;
 pub type Moment = u64;
 use crate::*;
 pub const MILLISECS_PER_BLOCK: Moment = 6000;
+use crate::pallet::*;
 
 #[derive( Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
 pub enum Frequency { 
@@ -32,6 +33,13 @@ pub enum Frequency {
 	Forthnightly,
 	Yearly
 }
+
+impl Default for Frequency { 
+	fn default() -> Self { 
+		Frequency::None
+	}
+}
+
 
 //	Due Date is determined by Block Per MilliSecs. DueDate = StartingBlock + Interval Based on Frequency
 //	milli per block =	12000 milli seconds
@@ -59,7 +67,7 @@ impl Frequency {
 			Frequency::Weekly => week,
 			Frequency::Forthnightly => week/2,
 			Frequency::Yearly => year,
-			Frequency::None => 0 as BlockNumber
+			Frequency::None => 0_u32
 		}
 	}
 }
@@ -112,27 +120,27 @@ pub struct Subscription<AccountId, BlockNumber, BalanceOf> {
 
 }
 
-pub const AQUARTER: Percent = Percent::from_percent(25);
-pub const HALF: Percent = Percent::from_percent(50);
-pub const THREEQUARTERS: Percent = Percent::from_percent(75);
-pub const FULL: Percent = Percent::from_percent(100);
+// pub const AQUARTER: Percent = Percent::from_percent(25);
+// pub const HALF: Percent = Percent::from_percent(50);
+// pub const THREEQUARTERS: Percent = Percent::from_percent(75);
+// pub const FULL: Percent = Percent::from_percent(100);
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
-pub enum Portion { 
-	AQuarter,
-	Half,
-	ThreeQuarters,
-	Full,
-}
+// #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
+// pub enum Portion { 
+// 	AQuarter,
+// 	Half,
+// 	ThreeQuarters,
+// 	Full,
+// }
 
-impl Portion { 
-	pub fn portion(&self) -> Percent { 
-		match self { 
-			Portion::AQuarter => AQUARTER,
-			Portion::Half => HALF,
-			Portion::ThreeQuarters => THREEQUARTERS,
-			Portion::Full => FULL
-		}
-	}
-}
+// impl Portion { 
+// 	pub fn portion(&self) -> Percent { 
+// 		match self { 
+// 			Portion::AQuarter => AQUARTER,
+// 			Portion::Half => HALF,
+// 			Portion::ThreeQuarters => THREEQUARTERS,
+// 			Portion::Full => FULL
+// 		}
+// 	}
+// }
     
