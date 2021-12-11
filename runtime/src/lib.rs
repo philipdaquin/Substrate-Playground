@@ -43,9 +43,13 @@ pub use sp_runtime::{Perbill, Permill};
 // pub use pallet_recurringpayments;
 // use runtime_common::
 
-
+/// ====> Start here <===========
 /// Import the template pallet.
 pub use pallet_template;
+pub use pallet_recurringpayments;
+pub use pallet_proxy;
+pub use pallet_scheduler;
+// 
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -196,9 +200,10 @@ impl frame_system::Config for Runtime {
 	/// The set code logic, just the default since we're not a parachain.
 	type OnSetCode = ();
 }
-
+/// ------------------------> Runtime Implementation <-------------------------------- ///
 impl pallet_randomness_collective_flip::Config for Runtime {}
 
+//	--------------------Pallet Aura---------------//	
 parameter_types! {
 	pub const MaxAuthorities: u32 = 32;
 }
@@ -208,6 +213,7 @@ impl pallet_aura::Config for Runtime {
 	type DisabledValidators = ();
 	type MaxAuthorities = MaxAuthorities;
 }
+//	-----------------GrandPa-----------------//
 
 impl pallet_grandpa::Config for Runtime {
 	type Event = Event;
@@ -232,6 +238,7 @@ impl pallet_grandpa::Config for Runtime {
 parameter_types! {
 	pub const MinimumPeriod: u64 = SLOT_DURATION / 2;
 }
+//	 ------------------------------------------//
 
 impl pallet_timestamp::Config for Runtime {
 	/// A timestamp: milliseconds since the unix epoch.
@@ -283,22 +290,31 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
-// parameter_types! { 
-// 	pub SubmissionDeposit: Balance = 50 * dollar(DOT);
-// }
+// =============> Pallet Recurring Payments Traits <=============// 
+parameter_types! {
+
+}
+
+impl pallet_recurringpayments::Config for Runtime { 
+
+}
+
+// ========> Pallet Proxy <=================//
+parameter_types! {
+
+}
+impl pallet_proxy::Config for Runtime { 
+
+}
+// =======> Pallet Scheduler <============//
+parameter_types! { 
+
+}
+impl pallet_scheduler::Config for Runtime { 
+
+}
 
 
-// impl pallet_recurringpayments::Config for Runtime { 
-// 	type Event = Event;
-// 	//type Assets = ();
-// 	type Currency = Currency;
-// 	type PalletId = PaymentPalletId;
-// 	type Moment = Moment;
-// 	type Balance = Balance;
-// 	type UnixTime = UnixTime;
-// 	type SubmissionDeposit = SubmissionDeposit;
-
-// }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -317,8 +333,12 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
-		// //	Recurring Payments 
-		// RecurringPaymentModule: pallet_recurringpayments,
+		
+		
+		// ============> Our Pallets <=============
+		RecurringPaymentModule: pallet_recurringpayments,
+		Proxy: pallet_proxy,
+		Scheduler: pallet_scheduler,
 
 		
 	}
