@@ -20,10 +20,10 @@ use frame_support::{RuntimeDebug, traits::OnTimestampSet};
 use scale_info::TypeInfo;
 pub type BlockNumber = u32;
 pub type Moment = u64;
-
+use crate::*;
 pub const MILLISECS_PER_BLOCK: Moment = 6000;
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
+#[derive( Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
 pub enum Frequency { 
 	None,
 	Daily,
@@ -135,4 +135,4 @@ impl Portion {
 		}
 	}
 }
-
+    
