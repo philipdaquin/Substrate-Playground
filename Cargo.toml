@@ -2,12 +2,12 @@
 members = [
 
 # --- NODEs ---
-  #'node',
+  'node',
   #'Custom_Nodes/proof_of_work',
 
 
 # --- RUNTIMEs ---
-  #'runtime',
+  'runtime',
 
 #PALLETS
    #'pallets/template',
