@@ -284,9 +284,6 @@ impl<T: Config> Pallet<T> {
         PaymentInfo::<T>::insert(payment_id, &payment_plan);
         Self::deposit_event(event_payment_sent);
 
-        //  
-
-
 
         //	Force Payments Takes in Abstract Accounts that are subscribed to payments 
         //	We convert the Subscriber's account back into source and create a create a scheduled dispatchable fucntion  

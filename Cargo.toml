@@ -14,12 +14,13 @@ members = [
       #'pallets/compound_interest',
       #'pallets/Fixed_points',
       #'pallets/ratingsystem'
-      'pallets/recurringpayments',
-      'pallets/membership',
+     # 'pallets/recurringpayments',
+     # 'pallets/authenticate',
       #'pallets/sumstorage',
       #'pallets/sumstorage/rpc',
       #'pallets/sumstorage/runtime-api',
       #'pallets/sumstorage',
+      'pallets/membership'
 
 # --- CONSENSUS ---
  #'consensus/pow',
