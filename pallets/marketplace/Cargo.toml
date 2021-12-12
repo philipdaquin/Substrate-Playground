@@ -60,6 +60,11 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
+[dependencies.pallet-ratingsystem]
+default-features = false
+path = '.../ratingsystem'
+
+
 [features]
 default = ['std']
 runtime-benchmarks = ['frame-benchmarking']

@@ -65,7 +65,7 @@ mod types;
 use crate::types::*;
 mod functions;
 //use crate::functions::*;
-pub use pallet_scheduler::pallet::*;
+//pub use pallet_scheduler::pallet::*;
 pub use pallet::*;
 
 
@@ -116,6 +116,7 @@ use super::*;
 	pub type BalanceOf<T> = <<T as Config>::Currency as Currency<AccountId<T>>>::Balance;
 	pub type AccountId<T> = <T as frame_system::Config>::AccountId;
 	pub type BlockNumber<T> = <T as frame_system::Config>::BlockNumber;
+	
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);

@@ -1,5 +1,5 @@
 [package]
-name = 'node-template-runtime'
+name = 'common-runtime'
 version = '4.0.0-dev'
 description = 'A fresh FRAME-based Substrate runtime, ready for hacking.'
 authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
@@ -24,9 +24,16 @@ version = '5.0.0-dev'
 
 [dependencies.codec]
 default-features = false
-features = ['derive']
+features = ['derive', 'max-encoded-len']
 package = 'parity-scale-codec'
 version = '2.0.0'
+
+[dependencies.scale-info]
+default-features = false
+features = ['derive', 'max-encoded-len']
+package = 'parity-scale-codec'
+version = '2.0.0'
+
 
 [dependencies.frame-benchmarking]
 default-features = false
@@ -118,11 +125,6 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
-[dependencies.scale-info]
-default-features = false
-features = ['derive']
-version = '1.0'
-
 [dependencies.sp-api]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -207,6 +209,26 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
+[dependencies.pallet-collective]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-11-1'
+version = '4.0.0-dev'
+
+[dependencies.pallet-membership]
+default-features = false
+git = 'https://github.com/paritytech/substrate.git'
+tag = 'monthly-2021-11-1'
+version = '4.0.0-dev'
+
+
+[dependencies]
+static_assertions = "1.1.0"
+num_enum = { version = "0.5.1", default-features = false }
+serde = { version = "1.0.124", optional = true, default-features = false }
+ethabi = { version = "15.0.0", default-features = false }
+
+
 
 [features]
 default = ['std']
@@ -222,6 +244,8 @@ runtime-benchmarks = [
     'sp-runtime/runtime-benchmarks',
 ]
 std = [
+    'num_enum/std',
+    'serde',
     'codec/std',
     'scale-info/std',
     'frame-executive/std',
@@ -235,6 +259,8 @@ std = [
     'pallet-sudo/std',
     'pallet-template/std',
     'pallet-timestamp/std',
+    'pallet-membership/std',
+    'pallet-collective/std',
     'pallet-transaction-payment-rpc-runtime-api/std',
     'pallet-transaction-payment/std',
     'pallet-proxy/std',
