@@ -67,11 +67,10 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 use pallet_transaction_payment::CurrencyAdapter;
 
-mod weights;
+
 
 /// Import the template pallet.
 pub use pallet_template;
-pub use pallet_paymentsystem::*;
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -203,7 +202,7 @@ pub fn get_all_module_accounts() -> Vec<AccountId> {
 
 impl frame_system::Config for Runtime {
 	/// The basic call filter to use in dispatchable.
-	type BaseCallFilter = ();
+	type BaseCallFilter = Contains<Self::Call>;
 	/// Block & extrinsics weights: base values and limits.
 	type BlockWeights = RuntimeBlockWeights;
 	/// The maximum length of a block (in bytes).
@@ -364,19 +363,7 @@ parameter_types! {
 }
 
 // The type used to represent the kinds of proxying allowed.
-#[derive(
-	Copy,
-	Clone,
-	Eq,
-	PartialEq,
-	Ord,
-	PartialOrd,
-	Encode,
-	Decode,
-	RuntimeDebug,
-	//MaxEncodedLen,
-	scale_info::TypeInfo,
-)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Encode, Decode, RuntimeDebug, MaxEncodedLen, scale_info::TypeInfo,)]
 pub enum ProxyType {
 	Any,
 //	NonTransfer,

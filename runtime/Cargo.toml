@@ -22,12 +22,6 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '5.0.0-dev'
 
-[dependencies.codec]
-default-features = false
-features = ['derive']
-package = 'parity-scale-codec'
-version = '2.0.0'
-
 [dependencies.frame-benchmarking]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -118,11 +112,6 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
-[dependencies.scale-info]
-default-features = false
-features = ['derive']
-version = '1.0'
-
 [dependencies.sp-api]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -207,6 +196,14 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
+
+[dependencies]
+static_assertions = "1.1.0"
+num_enum = { version = "0.5.1", default-features = false }
+serde = { version = "1.0.124", optional = true, default-features = false }
+codec = { package = "parity-scale-codec", version = "2.3.1", default-features = false, features = ["max-encoded-len"] }
+ethabi = { version = "15.0.0", default-features = false }
+scale-info = { version = "1.0", default-features = false, features = ["derive"] }
 
 [features]
 default = ['std']
