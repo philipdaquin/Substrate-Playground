@@ -20,7 +20,7 @@ members = [
       #'pallets/sumstorage/rpc',
       #'pallets/sumstorage/runtime-api',
       #'pallets/sumstorage',
-      'pallets/membership'
+     # 'pallets/membership'
 
 # --- CONSENSUS ---
  #'consensus/pow',
