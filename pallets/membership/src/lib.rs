@@ -115,7 +115,7 @@ pub mod pallet {
 				&company,
 				&acc,
 				&b"Member".to_vec(),
-				None()
+				None,
 			)?;
 			Ok(())
 		}
@@ -134,6 +134,7 @@ pub mod pallet {
 	}
 }
 //* To Learn Custom Origins  */
+//* Members of Organisation can only call this function/
 //	Check if the member is part of a consortium member is invoking a dispatch 
 pub struct EnsureOrg<T>(sp_std::marker::PhantomData<T>);
 impl<T: Config> EnsureOrigin<T::Origin> for EnsureOrg<T> { 
