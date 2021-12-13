@@ -42,7 +42,7 @@ default-features = false
 features = ['derive']
 version = '1.0'
 
-[dev-dependencies.sp-core]
+[dependencies.sp-core]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
@@ -54,11 +54,14 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
-[dev-dependencies.sp-runtime]
+[dependencies.sp-runtime]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
+
+[dependencies]
+sp-std = { version = '3.0', default-features = false }
 
 [features]
 default = ['std']
@@ -69,5 +72,6 @@ std = [
     'frame-support/std',
     'frame-system/std',
     'frame-benchmarking/std',
+    'sp-std/std',
 ]
 try-runtime = ['frame-support/try-runtime']
