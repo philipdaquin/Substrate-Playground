@@ -3610,7 +3610,6 @@ dependencies = [
  "pallet-grandpa",
  "pallet-proxy",
  "pallet-randomness-collective-flip",
- "pallet-recurringpayments",
  "pallet-scheduler",
  "pallet-sudo",
  "pallet-template",
@@ -3618,6 +3617,7 @@ dependencies = [
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
  "parity-scale-codec",
+ "paymentgateway",
  "scale-info",
  "serde",
  "sp-api",
@@ -3912,26 +3912,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-recurringpayments"
-version = "4.0.0-dev"
-dependencies = [
- "authenticate",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "pallet-proxy",
- "pallet-scheduler",
- "parity-scale-codec",
- "scale-info",
- "sp-arithmetic 3.0.0",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "sp-std 3.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "substrate-fixed",
-]
-
-[[package]]
 name = "pallet-scheduler"
 version = "4.0.0-dev"
 source = "git+https://github.com/paritytech/substrate.git?tag=monthly-2021-11-1#352c46a648a5f2d4526e790a184daa4a1ffdb3bf"
@@ -4220,6 +4200,26 @@ name = "paste"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0744126afe1a6dd7f394cb50a716dbe086cb06e255e53d8d0185d82828358fb5"
+
+[[package]]
+name = "paymentgateway"
+version = "4.0.0-dev"
+dependencies = [
+ "authenticate",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-proxy",
+ "pallet-scheduler",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-arithmetic 3.0.0",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std 3.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "substrate-fixed",
+]
 
 [[package]]
 name = "pbkdf2"
