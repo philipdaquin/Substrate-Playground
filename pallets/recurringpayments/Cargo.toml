@@ -74,8 +74,8 @@ version = '4.0.0-dev'
 
 [dependencies.pallet-authenticate]
 default-features = false
-package = 'pallet-authenticate'
-path = '../authenticate'
+package = 'authenticate'
+path = '../pallet-member/authenticate'
 
 
 [dependencies]

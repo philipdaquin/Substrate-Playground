@@ -20,7 +20,10 @@ members = [
       #'pallets/sumstorage/rpc',
       #'pallets/sumstorage/runtime-api',
       #'pallets/sumstorage',
-     # 'pallets/membership'
+     'pallets/pallet-member/membership',
+     'pallets/pallet-member/authenticate',
+     'pallets/pallet-member/identity',
+
 
 # --- CONSENSUS ---
  #'consensus/pow',

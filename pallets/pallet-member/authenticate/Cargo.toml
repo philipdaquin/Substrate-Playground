@@ -1,5 +1,5 @@
 [package]
-name = 'pallet-membership'
+name = 'authenticate'
 version = '4.0.0-dev'
 description = 'FRAME pallet template for defining custom runtime logic.'
 authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
@@ -61,9 +61,14 @@ tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
 [dependencies]
+serde = { version = "1.0.119", optional = true, features = ["derive"] }
 sp-std = { git = 'https://github.com/paritytech/substrate.git', branch = 'polkadot-v0.9.8', default-features = false }
 
-
+# [dependencies.pallet-timestamp]
+# default-features = false
+# git = 'https://github.com/paritytech/substrate.git'
+# tag = 'monthly-2021-11-1'
+# version = '4.0.0-dev'
 
 [features]
 default = ['std']
@@ -74,6 +79,9 @@ std = [
     'frame-support/std',
     'frame-system/std',
     'frame-benchmarking/std',
-    'sp-std/std'
+    'sp-std/std',
+    'serde',
+  #  'pallet-timestamp/std',
+    'sp-std/std',
 ]
 try-runtime = ['frame-support/try-runtime']
