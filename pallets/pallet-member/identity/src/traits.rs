@@ -1,9 +1,9 @@
-use std::convert::identity;
+
 use super::*;
 use crate::types::AttributeId;
 use frame_support::{dispatch::DispatchResult, traits::Time};
 
-pub trait Identity<AccountId, BlockNumber, Moment, Signature> { 
+pub trait Identifier<AccountId, BlockNumber, Moment, Signature> { 
     fn is_owner(
         identity: &AccountId, 
         actual_owner: &AccountId,

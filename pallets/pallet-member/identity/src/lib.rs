@@ -10,6 +10,8 @@
 pub use pallet::*;
 mod types;
 mod traits;
+mod functions;
+
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
@@ -29,7 +31,7 @@ pub mod pallet {
 use sp_core::blake2_256;
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
-use crate::{types::Attribute, traits::Identity};
+use crate::{types::Attribute, traits::Identifier};
 
 use super::*;
 	#[pallet::pallet]
@@ -53,8 +55,6 @@ use super::*;
 	pub type AccountId<T> = <T as frame_system::Config>::AccountId;
 	//	Identity delegates stored by type 
 	//	Delegates are only valud for a specific period defined as blocks number 
-	
-	
 	
 	#[pallet::storage]
 	#[pallet::getter(fn something)]
@@ -107,7 +107,12 @@ use super::*;
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-
+		OwnerChanged { 
+			identity: T::AccountId,
+			owner: T::AccountId,
+			new_owner: T::AccountId, 
+			now: T::BlockNumber
+		},
 
 	}
 
@@ -129,12 +134,38 @@ use super::*;
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		///		Transfers an identity represented as an AccountId from the owner account to 
+		/// 	to a target account 
 		#[pallet::weight(0)]
 		pub fn change_owner(
 			origin: OriginFor<T>,
 			identity: T::AccountId,
 			new_owner: T::AccountId
 		) -> DispatchResult { 
+			//	Check if we have an identity account or check if we have owner
+			let owner = ensure_signed(origin)?;
+			Self::is_owner(&identity, &owner)?;
+			match OwnerOf::<T>::contains_key(&identity) { 
+				//	If we find a val under this key, then we change the owner 
+				true => { 
+					OwnerOf::<T>::try_mutate(&identity, |account| -> DispatchResult { 
+						let curr = *account;
+						*account = Some(new_owner.clone());
+						
+						Ok(()) 
+					})
+				},
+ 				//	If we cant find a key, we'll add to new owner 			
+				false => { OwnerOf::<T>::insert(&identity, &new_owner); }
+			}
+			let now = frame_system::Pallet::<T>::block_number();
+			UpdatedBy::<T>::insert(&identity, (&owner, &now, T::Time::now()));
+			Self::deposit_event(Event::OwnerChanged { 
+				identity,
+				owner,
+				new_owner, 
+				now
+			});
 
 
 			Ok(())
