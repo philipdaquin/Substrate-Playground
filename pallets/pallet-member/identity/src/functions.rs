@@ -5,7 +5,8 @@ use super::*;
 use crate::types::*;
 use frame_support::{dispatch::DispatchResult, traits::Time};
 use sp_core::{sr25519::Signature, blake2_256};
-use sp_runtime::ArithmeticError;
+use sp_runtime::{ArithmeticError, traits::{Verify, CheckedAdd}};
+
 //  Trait Implementation 
 impl<T: Config> Identifier<T::AccountId, T::BlockNumber, <<T as Config>::Time as Time>::Moment, T::Signature>
 		for Pallet<T> 
@@ -69,54 +70,39 @@ impl<T: Config> Identifier<T::AccountId, T::BlockNumber, <<T as Config>::Time as
 
             ensure!(
                 Self::is_owner(identity, delegate).is_ok() || 
-                Self::valid_listed_delegate(identity, delegate_type, delegate).is_ok() || 
+                !Self::valid_listed_delegate(identity, delegate_type, delegate).is_ok() || 
                 owner != delegate, Error::<T>::InvalidDelegate
             );
             let now = frame_system::Pallet::<T>::block_number();
-            
+            let validity: T::BlockNumber = match valid_for {
+                Some(blocks) => now + blocks,
+                None => u32::max_value().into(),
+            };
             DelegateOf::<T>::insert(
-                (identity, delegate_type, delegate), 
-                match valid_for { 
-                    Some(num) => num + now,
-                    None => u32::max_value().into() 
-            });
+                (&identity, delegate_type, delegate), 
+                Some(validity)
+            );
             Ok(())
 
         }
     
         fn check_signature(
-            signature: &Signature, 
+            signature: &<T as pallet::Config>::Signature, 
             msg: &[u8], 
             signer: &T::AccountId
         ) -> DispatchResult { 
             //  Signature: Verify means of signature verification 
-            match signature.verify(msg, signer) { 
-                true => Ok(()),
-                false => { 
-                    return Err(Error::<T>::BadSignature)
-                }
+            if signature.verify(msg, signer) {
+                Ok(())
+            } else {
+                Err(Error::<T>::BadSignature.into())
             }
-            Ok(())
+         
         }
         
-        fn valid_signer(
-            identity: &T::AccountId,
-            signature: &Signature,
-            msg: &[u8],
-            signer: &T::AccountId,
-        ) -> DispatchResult { 
-            Self::valid_delegate(
-                &identity,
-                b"x25519VerificationKey2018",
-                &signer
-            )?;
-            Self::check_signature(&signature, &msg, &signer)?;
-            Ok(())
-        }
-    
         fn create_attribute(
-            owner: &T::AccountId,
-            identity: &T::AccountId, 
+            owner: &AccountId<T>,
+            identity: &AccountId<T>, 
             name: &[u8],
             value: &[u8],
             valid_for: Option<T::BlockNumber>
@@ -126,19 +112,21 @@ impl<T: Config> Identifier<T::AccountId, T::BlockNumber, <<T as Config>::Time as
             //   Check for duplicates
             ensure!(Self::attribute_and_id(identity, name).is_some(), Error::<T>::AttributeCreationFailed);
 
-            let time_now: Moment = T::Time::now();
+            let time_now: Moment<T> = T::Time::now();
             let now = frame_system::Pallet::<T>::block_number();
             
             let validity: T::BlockNumber = match valid_for { 
                 Some(block) => now + block,
                 None => u32::max_value().into()
             };
-            let nonce = Self::get_next_nonce(identity, name);
+            let nonce = Self::get_next_nonce(identity, name)?;
+            let id = (&identity, name, nonce).using_encoded(blake2_256);
+            
             AttributeOf::<T>::insert(
-                owner, 
-                Attribute::<T::BlockNumber, Moment> { 
-                    name: name.to_vec(),
-                    value: value.to_vec(),
+                (owner, id), 
+                Attribute::<T::BlockNumber, Moment<T>> { 
+                    name: (name).to_vec(),
+                    value: (value).to_vec(),
                     validity,
                     creation: time_now,
                     nonce
@@ -153,23 +141,19 @@ impl<T: Config> Identifier<T::AccountId, T::BlockNumber, <<T as Config>::Time as
         
         //  Updates the attribute validity to make it expire and invalid 
         fn reset_attributes(
-            owner: &T::AccountId, 
+            owner: T::AccountId, 
             identity: &T::AccountId,
             name: &[u8]
         ) -> DispatchResult {
-            Self::is_owner(identity, owner)?;
+            Self::is_owner(identity, &owner)?;
             let result = Self::attribute_and_id(identity, name);
             let now = frame_system::Pallet::<T>::block_number();
-            match result { 
-                Some((mut attribute, id))  => { 
-                   attribute.validity = now;
-                   AttributeOf::<T>::mutate((&identity, id), |a| { 
-                       let curr = a*
-                       *a = attribute;
-                       curr
-                   });
+            match result {
+                Some((mut attribute, id)) => {
+                    attribute.validity = <frame_system::Pallet<T>>::block_number();
+                    <AttributeOf<T>>::mutate((&identity, id), |a| *a = attribute);
                 }
-                None => return Err(Error::<T>::AttributeResetFailed.into())
+                None => return Err(Error::<T>::AttributeResetFailed.into()),
             }
             UpdatedBy::<T>::insert(
                 identity,
@@ -220,14 +204,60 @@ impl<T: Config> Identifier<T::AccountId, T::BlockNumber, <<T as Config>::Time as
                 None
             }
         }
+        fn valid_signer(
+            identity: &T::AccountId,
+            signature: &<T as pallet::Config>::Signature,
+            msg: &[u8],
+            signer: &T::AccountId,
+        ) -> DispatchResult { 
+            Self::valid_delegate(
+                &identity,
+                b"x25519VerificationKey2018",
+                &signer
+            )?;
+            Self::check_signature(&signature, &msg, &signer)?;
+            Ok(())
+        }
 
 	}
 impl<T: Config> Pallet<T> { 
-    fn get_next_nonce(identity: T::AccountId, name: &[u8]) -> Result<u64, DispatchError> { 
-        AttributeOf::<T>::try_mutate((identity, name), |nonce| -> Result<u64, DispatchError> { 
+    fn get_next_nonce(identity: &T::AccountId, name: &[u8]) -> Result<u64, DispatchError> { 
+        AttributeNonce::<T>::mutate((identity, name.to_vec()), |nonce| -> Result<u64, DispatchError> { 
             let curr = *nonce;
             *nonce = nonce.checked_add(1).ok_or(ArithmeticError::Overflow)?;
-            Ok(curr)
+            Ok(*nonce)
         })
     }
+    fn signed_attribute(
+        who: T::AccountId, 
+        encoded: &[u8],
+        transaction: &AttributeTransaction<T::Signature, T::AccountId>
+    ) -> DispatchResult { 
+        //  Verify that the data was signed by the owner or a not expired signer delegate
+        Self::valid_signer(
+            &transaction.identity,
+            &transaction.signature,
+            encoded,
+            &transaction.signer
+        )?;
+        //  Check attribute is owned by signer
+        Self::is_owner(&transaction.identity, &transaction.signer)?;
+        let now = frame_system::Pallet::<T>::block_number();
+        ensure!(transaction.name.len() <= 64, Error::<T>::BadTransaction);
+
+        let valid = now + transaction.validity.into() ;
+        if valid > now { 
+            Self::create_attribute(
+                &who,
+                &transaction.identity,
+                &transaction.name,
+                &transaction.value,
+                Some(transaction.validity.into())
+            );
+        } else { 
+            Self::reset_attributes(who, &transaction.identity, &transaction.name)?;
+        }
+        Ok(())
+
+    }   
 }

@@ -22,7 +22,7 @@ mod benchmarking;
 use codec::{Encode, Decode};
 use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
 use frame_system::pallet_prelude::*;
-	
+use scale_info::TypeInfo;
 
 
 #[frame_support::pallet]
@@ -31,7 +31,7 @@ pub mod pallet {
 use sp_core::blake2_256;
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
-use crate::{types::Attribute, traits::Identifier};
+use crate::{types::{Attribute, AttributeTransaction}, traits::Identifier};
 
 use super::*;
 	#[pallet::pallet]
@@ -61,18 +61,18 @@ use super::*;
 	pub type DelegateOf<T> = StorageMap<
 		_,
 		Blake2_128Concat,
-		(T::AccountId, Vec<u8>, T::AccountId),
+		(AccountId<T>, Vec<u8>, AccountId<T>),
 		Option<BlockNumber<T>>,
 		ValueQuery
 	>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn attribute_of)]
-	pub type AttributeOf<T> = StorageMap<
+	pub type AttributeOf<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
-		(T::AccountId, [u8; 32]),
-		Attribute<T::BlockNumber, Moment<T>>,
+		(AccountId<T>, [u8; 32]),
+		Attribute<BlockNumber<T>, Moment<T>>,
 		ValueQuery
 	>;
 
@@ -81,7 +81,7 @@ use super::*;
 	pub type AttributeNonce<T> = StorageMap<
 		_,
 		Blake2_128Concat,
-		(T::AccountId, Vec<u8>),
+		(AccountId<T>, Vec<u8>),
 		u64,
 		ValueQuery
 	>;
@@ -90,31 +90,58 @@ use super::*;
 	pub type OwnerOf<T> = StorageMap<
 		_,
 		Blake2_128Concat,
-		T::AccountId, 
-		Option<T::AccountId>,
-		ValueQuery
+		AccountId<T>, 
+		AccountId<T>,
+		OptionQuery
 	>;
 	#[pallet::storage]
 	#[pallet::getter(fn updated_by)]
 	pub type UpdatedBy<T> = StorageMap<
 		_,
 		Blake2_128Concat,
-		T::AccountId,
-		(T::AccountId, T::BlockNumber, Moment<T>),
+		AccountId<T>,
+		(AccountId<T>, BlockNumber<T>, Moment<T>),
 		ValueQuery
 	>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
-	pub enum Event<T: Config> {
+	pub enum Event<T: Config>  {
 		OwnerChanged { 
 			identity: T::AccountId,
 			owner: T::AccountId,
 			new_owner: T::AccountId, 
 			now: T::BlockNumber
 		},
-
+		DelegateAdded { 
+			identity: T::AccountId,
+			delegate_type: Vec<u8>,
+			delegate: T::AccountId, 
+			valid_for: Option<T::BlockNumber>
+		},
+		DelegateRevoked { 
+			identity: T::AccountId,
+			delegate_type: Vec<u8>,
+			delegate: T::AccountId,
+		},
+		AttributeAdded { 
+			identity: T::AccountId,
+			name: Vec<u8>,
+			valid_for: Option<T::BlockNumber>
+		},
+		AttributeRevoked { 
+			identity: T::AccountId,
+			name: Vec<u8>,
+			now: T::BlockNumber
+		},
+		AttributeDeleted { 
+			identity: T::AccountId,
+			name: Vec<u8>, 
+			now: T::BlockNumber,
+			
+		}
 	}
+
 
 	#[pallet::error]
 	pub enum Error<T> {
@@ -127,6 +154,7 @@ use super::*;
         InvalidAttribute,
         Overflow,
         BadTransaction,
+		Unknown
 	}
 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -145,19 +173,13 @@ use super::*;
 			//	Check if we have an identity account or check if we have owner
 			let owner = ensure_signed(origin)?;
 			Self::is_owner(&identity, &owner)?;
-			match OwnerOf::<T>::contains_key(&identity) { 
-				//	If we find a val under this key, then we change the owner 
-				true => { 
-					OwnerOf::<T>::try_mutate(&identity, |account| -> DispatchResult { 
-						let curr = *account;
-						*account = Some(new_owner.clone());
-						
-						Ok(()) 
-					})
-				},
- 				//	If we cant find a key, we'll add to new owner 			
-				false => { OwnerOf::<T>::insert(&identity, &new_owner); }
-			}
+			if OwnerOf::<T>::contains_key(&identity) {
+                // Update to new owner.
+                OwnerOf::<T>::mutate(&identity, |o| *o = Some(new_owner.clone()));
+            } else {
+                // Add to new owner.
+                OwnerOf::<T>::insert(&identity, &new_owner);
+            }
 			let now = frame_system::Pallet::<T>::block_number();
 			UpdatedBy::<T>::insert(&identity, (&owner, &now, T::Time::now()));
 			Self::deposit_event(Event::OwnerChanged { 
@@ -173,44 +195,146 @@ use super::*;
 
 		#[pallet::weight(0)]
 		pub fn add_delegate(
-			origin: OriginFor<T>
+			origin: OriginFor<T>,
+			identity: T::AccountId,
+			delegate: T::AccountId, 
+			delegate_type: Vec<u8>,
+			valid_for: Option<T::BlockNumber>
 		) -> DispatchResult { 
+			let owner = ensure_signed(origin)?;
+			ensure!(delegate_type.len() <= 64, Error::<T>::InvalidDelegate);
 
+			Self::create_delegate(&owner, &identity, &delegate, &delegate_type, valid_for)?;
+			let now = frame_system::Pallet::<T>::block_number();
+			let time = T::Time::now();
+			
+			UpdatedBy::<T>::insert(&identity, (&owner, &now, time));
+			
+			Self::deposit_event(Event::DelegateAdded { 
+				identity, 
+				delegate_type, 
+				delegate,
+				valid_for,
+			});
 			Ok(())
 		}
+		///		The process of assigning a specific identity attribute or feature 
 		#[pallet::weight(0)]
 		pub fn revoke_delegate(
-			origin: OriginFor<T>
+			origin: OriginFor<T>,
+			identity: T::AccountId, 
+			delegate: T::AccountId,
+			delegate_type: Vec<u8>
 		) -> DispatchResult { 
+			let owner = ensure_signed(origin)?;
+			ensure!(delegate_type.len() <= 64, Error::<T>::InvalidDelegate);
+			//	Check if the owner own the delegate
+			Self::is_owner(&identity, &owner)?;
+			//	Check if the delegate is valid 
+			Self::valid_listed_delegate(&identity, &delegate_type, &delegate)?;
+			let now = frame_system::Pallet::<T>::block_number();
+			let time = T::Time::now();
+			DelegateOf::<T>::mutate(
+				(&identity, &delegate_type, &delegate), |block| 
+				*block = Some(now)
+			);
 
+			//	Update Storage 
+			UpdatedBy::<T>::insert(&identity, (owner, now, time));
+			
+			Self::deposit_event(Event::DelegateRevoked { 
+				identity,
+				delegate_type,
+				delegate,
+			});
 			Ok(())
 		}
 		#[pallet::weight(0)]
 		pub fn add_attribute(
-			origin: OriginFor<T>
+			origin: OriginFor<T>,
+			identity: T::AccountId,
+			name: Vec<u8>,
+			value: Vec<u8>,
+			valid_for: Option<T::BlockNumber>,
 		) -> DispatchResult { 
+			let owner = ensure_signed(origin)?;
+			ensure!(name.len() <= 65, Error::<T>::AttributeCreationFailed);
 
+			Self::create_attribute(&owner, &identity, &name, &value,valid_for)?;
+
+			Self::deposit_event(Event::AttributeAdded { 
+				identity,
+				name,
+				valid_for
+			});
+			
 			Ok(())
 		}
+		//	Revokes an attribute from an identity
+		//	Sets its expiration period to the actual block number 
 		#[pallet::weight(0)]
 		pub fn revoke_attribute(
-			origin: OriginFor<T>
+			origin: OriginFor<T>,
+			identity: T::AccountId, 
+			name: Vec<u8>
 		) -> DispatchResult { 
+			let owner = ensure_signed(origin)?;
+			ensure!(name.len() <= 64, Error::<T>::AttributeRemovalFailed);
+			Self::reset_attributes(owner, &identity, &name)?;
+
+			let now = frame_system::Pallet::<T>::block_number();
+			Self::deposit_event(Event::AttributeRevoked { 
+				identity,
+				name,
+				now
+			});
 
 			Ok(())
 		}
 		#[pallet::weight(0)]
 		pub fn delete_attribute(
-			origin: OriginFor<T>
+			origin: OriginFor<T>,
+			identity: T::AccountId,
+			name: Vec<u8>
 		) -> DispatchResult { 
+			let owner = ensure_signed(origin)?;
+			//	Check if we are the owner 
+			Self::is_owner(&identity, &owner)?;
+			//	check if the name is valid 
+			ensure!(name.len() <= 64, Error::<T>::AttributeRemovalFailed);
+			//	Get Attribute and Hash Identifier 
+			let result = Self::attribute_and_id(&identity, &name);
+			//	Get the hash identifier for this attribute 
+			match result { 
+				Some((_, id)) => AttributeOf::<T>::remove((&identity, &id)),
+				None => return Err(Error::<T>::AttributeRemovalFailed.into())
+			}
+			let now = frame_system::Pallet::<T>::block_number();
+			UpdatedBy::<T>::insert(&identity, (owner, &now, T::Time::now()));
+			Self::deposit_event(Event::AttributeDeleted { 
+				identity,
+				name, 
+				now
 
+			});
 			Ok(())
 		}
+		//	Execute off chain signed transaction 
 		#[pallet::weight(0)]
 		pub fn execute(
-			origin: OriginFor<T>
+			origin: OriginFor<T>,
+			transaction: AttributeTransaction<T::Signature, T::AccountId>
 		) -> DispatchResult { 
+			let owner = ensure_signed(origin)?;
 
+			let mut encoded = transaction.name.encode();
+			//	encode: converts the self into an owned vector 
+			encoded.extend(transaction.value.encode());
+			encoded.extend(transaction.validity.encode());
+			encoded.extend(transaction.identity.encode());
+
+			//	Execute 
+		
 			Ok(())
 		}
 	}

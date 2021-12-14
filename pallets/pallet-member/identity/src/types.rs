@@ -1,7 +1,8 @@
 use codec::{Decode, Encode};
+use scale_info::TypeInfo;
 use sp_core::RuntimeDebug;
 use sp_std::vec::Vec;
-
+use super::*;
 //  Attributes or properties that make an identity 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Encode, 
     Decode, Default, RuntimeDebug)]
