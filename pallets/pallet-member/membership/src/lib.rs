@@ -83,7 +83,7 @@ pub mod pallet {
 
 			Company::<T>::put(company_info);
 
-			Did::Pallet::<T>::create_attribute(
+			identity::Pallet::<T>::create_attribute(
 				&sender, 
 				&sender,
 				b"Org",
@@ -110,7 +110,7 @@ pub mod pallet {
 			} else { 
 				return Err(Error::<T>::AlreadyAMember.into())
 			}
-			Did::Pallet::<T>::create_delegate(
+			identity::Pallet::<T>::create_delegate(
 				&company,
 				&company,
 				&acc,
@@ -124,7 +124,7 @@ pub mod pallet {
 		pub fn verify_member(acc: &T::AccountId) -> bool { 
 			let organisation= Company::<T>::get();
 			for member in organisation.iter() { 
-				if Did::Pallet::<T>::valid_delegate(member,
+				if identity::Pallet::<T>::valid_delegate(member,
 				&b"Member".to_vec(), &acc).is_ok() { 
 					return true 
 				}

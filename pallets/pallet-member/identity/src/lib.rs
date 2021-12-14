@@ -28,7 +28,8 @@ use scale_info::TypeInfo;
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::traits::Time;
-use sp_core::blake2_256;
+use sp_core::{blake2_256, // sr25519::Signature
+};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
 use crate::{types::{Attribute, AttributeTransaction}, traits::Identifier};
@@ -139,7 +140,8 @@ use super::*;
 			name: Vec<u8>, 
 			now: T::BlockNumber,
 			
-		}
+		},
+		AttributeTransactionExecuted(AttributeTransaction<T::Signature, AccountId<T>>)
 	}
 
 
@@ -334,12 +336,9 @@ use super::*;
 			encoded.extend(transaction.identity.encode());
 
 			//	Execute 
-		
+			Self::signed_attribute(owner, &encoded, &transaction)?;
+            Self::deposit_event(Event::AttributeTransactionExecuted(transaction));
 			Ok(())
 		}
-	}
-	//	Publiic Functions
-	impl<T: Config> Pallet<T> { 
-
 	}
 }

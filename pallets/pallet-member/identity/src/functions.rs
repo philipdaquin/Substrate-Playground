@@ -228,7 +228,7 @@ impl<T: Config> Pallet<T> {
             Ok(*nonce)
         })
     }
-    fn signed_attribute(
+   pub(super) fn signed_attribute(
         who: T::AccountId, 
         encoded: &[u8],
         transaction: &AttributeTransaction<T::Signature, T::AccountId>

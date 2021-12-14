@@ -23,6 +23,7 @@ members = [
      #'pallets/pallet-member/membership',
      #'pallets/pallet-member/authenticate',
      'pallets/pallet-member/*',
+     
 
 
 # --- CONSENSUS ---
