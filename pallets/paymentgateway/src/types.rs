@@ -25,6 +25,14 @@ pub const MILLISECS_PER_BLOCK: Moment = 6000;
 use crate::pallet::*;
 
 #[derive( Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
+pub enum Status { 
+	Paid,
+	UnPaid
+}
+
+
+
+#[derive( Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo)]
 pub enum Frequency { 
 	None,
 	Daily,

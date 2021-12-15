@@ -27,7 +27,7 @@ use scale_info::TypeInfo;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::traits::Time;
+use frame_support::traits::Time;
 use sp_core::{blake2_256, // sr25519::Signature
 };
 use sp_runtime::traits::{IdentifyAccount, Verify};

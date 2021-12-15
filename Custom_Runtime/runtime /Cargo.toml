@@ -22,6 +22,12 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '5.0.0-dev'
 
+[dependencies.codec]
+default-features = false
+features = ['derive']
+package = 'parity-scale-codec'
+version = '2.0.0'
+
 [dependencies.frame-benchmarking]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -112,6 +118,11 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
+[dependencies.scale-info]
+default-features = false
+features = ['derive']
+version = '1.0'
+
 [dependencies.sp-api]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -178,54 +189,6 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
-[dependencies]
-static_assertions = "1.1.0"
-num_enum = { version = "0.5.1", default-features = false }
-serde = { version = "1.0.124", optional = true, default-features = false }
-codec = { package = "parity-scale-codec", version = "2.3.1", default-features = false, features = ["max-encoded-len"] }
-ethabi = { version = "15.0.0", default-features = false }
-scale-info = { version = "1.0", default-features = false, features = ["derive"] }
-
-[dependencies.paymentgateway]
-default-features = false
-path = '../pallets/paymentgateway'
-
-[dependencies.pallet-proxy]
-default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-tag = 'monthly-2021-11-1'
-version = '4.0.0-dev'
-
-[dependencies.pallet-scheduler]
-default-features = false
-git = 'https://github.com/paritytech/substrate.git'
-tag = 'monthly-2021-11-1'
-version = '4.0.0-dev'
-
-
-# Pallet - Members: 
-[dependencies.authenticate]
-default-features = false
-path = '../pallets/pallet-member/authenticate'
-
-[dependencies.identity]
-default-features = false
-path = '../pallets/pallet-member/identity'
-
-[dependencies.membership]
-default-features = false
-path = '../pallets/pallet-member/membership'
-
-# Pallet - Marketplace
-[dependencies.marketplace]
-default-features = false
-path = '../pallets/pallet-shop/marketplace'
-
-[dependencies.ratingsystem]
-default-features = false
-path = '../pallets/pallet-shop/ratingsystem'
-
-
 [features]
 default = ['std']
 runtime-benchmarks = [
@@ -255,8 +218,6 @@ std = [
     'pallet-timestamp/std',
     'pallet-transaction-payment-rpc-runtime-api/std',
     'pallet-transaction-payment/std',
-    'pallet-proxy/std',
-    'pallet-scheduler/std',
     'sp-api/std',
     'sp-block-builder/std',
     'sp-consensus-aura/std',
@@ -268,5 +229,4 @@ std = [
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
-    'paymentgateway/std',
 ]

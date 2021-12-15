@@ -1,5 +1,5 @@
 [package]
-name = 'pallet-template'
+name = 'marketplace'
 version = '4.0.0-dev'
 description = 'FRAME pallet template for defining custom runtime logic.'
 authors = ['Substrate DevHub <https://github.com/substrate-developer-hub>']
@@ -60,9 +60,9 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
-[dependencies.pallet-ratingsystem]
+[dependencies.ratingsystem]
 default-features = false
-path = '.../ratingsystem'
+path = '../ratingsystem'
 
 
 [features]

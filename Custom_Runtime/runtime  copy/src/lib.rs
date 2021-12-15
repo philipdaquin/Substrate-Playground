@@ -283,22 +283,6 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
-// parameter_types! { 
-// 	pub SubmissionDeposit: Balance = 50 * dollar(DOT);
-// }
-
-
-// impl pallet_recurringpayments::Config for Runtime { 
-// 	type Event = Event;
-// 	//type Assets = ();
-// 	type Currency = Currency;
-// 	type PalletId = PaymentPalletId;
-// 	type Moment = Moment;
-// 	type Balance = Balance;
-// 	type UnixTime = UnixTime;
-// 	type SubmissionDeposit = SubmissionDeposit;
-
-// }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
@@ -317,9 +301,7 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
-		// //	Recurring Payments 
-		// RecurringPaymentModule: pallet_recurringpayments,
-
+	
 		
 	}
 );
