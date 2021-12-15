@@ -53,7 +53,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> { 
 
 	}
-	impl<T: Config> Reputation<T> for Pallet<T> { 
+	// impl<T: Config> Reputation<T> for Pallet<T> { 
 
-	}
+	// }
 }

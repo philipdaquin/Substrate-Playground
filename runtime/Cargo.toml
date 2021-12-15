@@ -186,10 +186,6 @@ codec = { package = "parity-scale-codec", version = "2.3.1", default-features = 
 ethabi = { version = "15.0.0", default-features = false }
 scale-info = { version = "1.0", default-features = false, features = ["derive"] }
 
-[dependencies.paymentgateway]
-default-features = false
-path = '../pallets/paymentgateway'
-
 [dependencies.pallet-proxy]
 default-features = false
 git = 'https://github.com/paritytech/substrate.git'
@@ -202,6 +198,10 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
+# Payment Gateway
+[dependencies.paymentgateway]
+default-features = false
+path = '../pallets/paymentgateway'
 
 # Pallet - Members: 
 [dependencies.authenticate]
@@ -268,5 +268,10 @@ std = [
     'sp-std/std',
     'sp-transaction-pool/std',
     'sp-version/std',
+    
     'paymentgateway/std',
+
+    'authenticate/std',
+    'identity/std',
+    'membership/std',
 ]

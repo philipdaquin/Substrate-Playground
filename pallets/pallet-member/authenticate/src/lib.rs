@@ -42,11 +42,10 @@ pub mod pallet {
 	
 use sp_runtime::traits::{AtLeast32Bit, StaticLookup};
 pub type Moment = u64;
-
+use std::marker::PhantomData;
 use super::*;
 use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{ChangeMembers, InitializeMembers}, Blake2_128Concat};
 	use frame_system::pallet_prelude::*;
-	use frame_support::pallet_prelude::PhantomData;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -66,10 +65,6 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Change
 		//	force Orign 
 		type ForceOrigin: EnsureOrigin<Self::Origin>;
 		type UnixTime: UnixTime;
-	
-		
-	
-		
 	
 	}
 	pub type AccountId<T> = <T as frame_system::Config>::AccountId;

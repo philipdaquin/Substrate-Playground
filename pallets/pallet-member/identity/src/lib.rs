@@ -8,9 +8,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub use pallet::*;
-mod types;
-mod traits;
-mod functions;
+pub mod types;
+pub mod traits;
+pub mod functions;
 
 #[cfg(test)]
 mod mock;
@@ -22,22 +22,26 @@ mod benchmarking;
 use codec::{Encode, Decode};
 use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
 use frame_system::pallet_prelude::*;
+use frame_support::traits::Time;
 use scale_info::TypeInfo;
+use sp_io::hashing::blake2_256;
+
+use sp_runtime::traits::{IdentifyAccount, Verify, Member};
+use crate::traits::*;
+
+
 
 
 #[frame_support::pallet]
-pub mod pallet {
-use frame_support::traits::Time;
-use sp_core::{blake2_256, // sr25519::Signature
-};
-use sp_runtime::traits::{IdentifyAccount, Verify};
-
-use crate::{types::{Attribute, AttributeTransaction}, traits::Identifier};
-
+	pub mod pallet {
+	use scale_info::TypeInfo;
+use sp_std::{prelude::*};
+	use crate::types::AttributeTransaction;
+use crate::types::Attribute;
 use super::*;
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
-	pub struct Pallet<T>(_);
+	pub struct Pallet<T>(PhantomData<T>);
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -50,7 +54,6 @@ use super::*;
 		type Signature: Verify<Signer = Self::Public> + Member + Decode + Encode;
 		type Time: Time;
 	}
-
 	pub type Moment<T> = <<T as Config>::Time as Time>::Moment;
 	pub type BlockNumber<T> = <T as frame_system::Config>::BlockNumber;
 	pub type AccountId<T> = <T as frame_system::Config>::AccountId;
@@ -58,7 +61,7 @@ use super::*;
 	//	Delegates are only valud for a specific period defined as blocks number 
 	
 	#[pallet::storage]
-	#[pallet::getter(fn something)]
+	#[pallet::getter(fn delegate_of)]
 	pub type DelegateOf<T> = StorageMap<
 		_,
 		Blake2_128Concat,
@@ -72,8 +75,8 @@ use super::*;
 	pub type AttributeOf<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
-		(AccountId<T>, [u8; 32]),
-		Attribute<BlockNumber<T>, Moment<T>>,
+		(T::AccountId, [u8; 32]),
+		Attribute<T::BlockNumber, <<T as Config>::Time as Time>::Moment>,
 		ValueQuery
 	>;
 
@@ -101,7 +104,7 @@ use super::*;
 		_,
 		Blake2_128Concat,
 		AccountId<T>,
-		(AccountId<T>, BlockNumber<T>, Moment<T>),
+		(AccountId<T>, BlockNumber<T>, <<T as Config>::Time as Time>::Moment),
 		ValueQuery
 	>;
 
@@ -163,7 +166,7 @@ use super::*;
 	// These functions materialize as "extrinsics", which are often compared to transactions.
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
-	impl<T: Config> Pallet<T> {
+	impl<T: Config> Pallet<T>  {
 		///		Transfers an identity represented as an AccountId from the owner account to 
 		/// 	to a target account 
 		#[pallet::weight(0)]
@@ -190,7 +193,6 @@ use super::*;
 				new_owner, 
 				now
 			});
-
 
 			Ok(())
 		}
@@ -282,7 +284,7 @@ use super::*;
 		) -> DispatchResult { 
 			let owner = ensure_signed(origin)?;
 			ensure!(name.len() <= 64, Error::<T>::AttributeRemovalFailed);
-			Self::reset_attributes(owner, &identity, &name)?;
+			Self::reset_attribute(owner, &identity, &name)?;
 
 			let now = frame_system::Pallet::<T>::block_number();
 			Self::deposit_event(Event::AttributeRevoked { 
@@ -307,10 +309,10 @@ use super::*;
 			//	Get Attribute and Hash Identifier 
 			let result = Self::attribute_and_id(&identity, &name);
 			//	Get the hash identifier for this attribute 
-			match result { 
-				Some((_, id)) => AttributeOf::<T>::remove((&identity, &id)),
-				None => return Err(Error::<T>::AttributeRemovalFailed.into())
-			}
+			match result {
+                Some((_, id)) => <AttributeOf<T>>::remove((&identity, &id)),
+                None => return Err(Error::<T>::AttributeRemovalFailed.into()),
+            }
 			let now = frame_system::Pallet::<T>::block_number();
 			UpdatedBy::<T>::insert(&identity, (owner, &now, T::Time::now()));
 			Self::deposit_event(Event::AttributeDeleted { 

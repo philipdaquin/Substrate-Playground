@@ -3,6 +3,7 @@
 #![recursion_limit="256"]
 
 
+use authenticate::Event;
 use frame_system::{
 	limits::{BlockLength, BlockWeights},
 	EnsureRoot,
@@ -11,7 +12,7 @@ use sp_std::prelude::*;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
 	ApplyExtrinsicResult, generic, create_runtime_str, impl_opaque_keys, MultiSignature,
-	transaction_validity::{TransactionValidity, TransactionSource},
+	transaction_validity::{TransactionValidity, TransactionSource}, MultiSigner,
 };
 use frame_support::{
 	construct_runtime, parameter_types, StorageValue,
@@ -27,7 +28,7 @@ use frame_support::{
 		//	Nothing
 		//Named,
 		LockIdentifier,  OnUnbalanced,
-		U128CurrencyToVote, MaxEncodedLen},
+		U128CurrencyToVote},
 	weights::{
 		Weight, IdentityFee,
 		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
@@ -151,6 +152,9 @@ pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
 pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
 pub const HOURS: BlockNumber = MINUTES * 60;
 pub const DAYS: BlockNumber = HOURS * 24;
+pub const WEEKS: BlockNumber = DAYS * 7;
+pub const MONTHS: BlockNumber = WEEKS * 4;
+pub const YEARS: BlockNumber = MONTHS * 12;
 
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
@@ -160,6 +164,13 @@ pub fn native_version() -> NativeVersion {
 		can_author_with: Default::default(),
 	}
 }
+
+// Currency units.
+pub const MILLICENTS: Balance = 1_000_000_000;
+pub const CENTS: Balance = 1_000 * MILLICENTS;
+pub const DOLLARS: Balance = 100 * CENTS;
+
+
 const AVERAGE_ON_INITIALIZE_RATIO: Perbill = Perbill::from_percent(10);
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 const MAXIMUM_BLOCK_WEIGHT: Weight = 2 * WEIGHT_PER_SECOND;
@@ -350,7 +361,7 @@ impl pallet_template::Config for Runtime {
 // }
 
 
-
+pub use pallet_proxy;
 parameter_types! {
 	// One storage item; key size 32, value size 8; .
 	pub const ProxyDepositBase: Balance = 10;
@@ -421,10 +432,8 @@ impl pallet_proxy::Config for Runtime {
 	type AnnouncementDepositBase = AnnouncementDepositBase;
 	type AnnouncementDepositFactor = AnnouncementDepositFactor;
 }
-
+pub use pallet_scheduler;
 parameter_types! {
-	pub MaximumSchedulerWeight: Weight = Perbill::from_percent(80) *
-		RuntimeBlockWeights::get().max_block;
 	pub const MaxScheduledPerBlock: u32 = 50;
 	// Retry a scheduled item every 10 blocks (1 minute) until the preimage exists.
 	//pub const NoPreimagePostponement: Option<u32> = Some(10);
@@ -433,24 +442,24 @@ parameter_types! {
 impl pallet_scheduler::Config for Runtime {
 	type Event = Event;
 	type Origin = Origin;
-	type PalletsOrigin = OriginCaller;
 	type Call = Call;
-	type MaximumWeight = MaximumSchedulerWeight;
-	type ScheduleOrigin = EnsureRoot<AccountId>;
+	type MaximumWeight = MaximumBlockWeight;
+	type PalletsOrigin = OriginCaller;
+	type ScheduleOrigin = frame_system::EnsureRoot<AccountId>;
 	type MaxScheduledPerBlock = MaxScheduledPerBlock;
-	type WeightInfo = pallet_scheduler::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 	//type OriginPrivilegeCmp = EqualPrivilegeOnly;
 	//type PreimageProvider = Preimage;
 	//type NoPreimagePostponement = NoPreimagePostponement;
 }
 
-
+pub use paymentgateway;
 parameter_types! { 
 	pub const StringLimit: u32 = 50;
 	pub const SubmissionDeposit: u128 = 10;
 }
 
-impl pallet_recurringpayments::Config for Runtime { 
+impl pallet_paymentgateway::Config for Runtime { 
 	type Event = Event;
 	type Currency = Balances;
 	type Moment = Moment;
@@ -461,7 +470,30 @@ impl pallet_recurringpayments::Config for Runtime {
 	type StringLimit = StringLimit;
 	type SubmissionDeposit = SubmissionDeposit;
 	type Scheduler = ScheduleOrigin<BlockNumber, Info, PalletsOrigin>;
+
+	//	pub const Trial = 7 * DAYSF; 
+	//	pub const Monthy = 7 * 
+	//	pub const Yearly 
+
+
 }
+
+
+pub use authenticate;
+impl authenticate::Config for Runtime { 
+	type Event = Event;
+	type AddOrigin = = identity
+	
+}
+
+pub use identity;
+impl identity::Config for Runtime { 
+	type Event = Event;
+	type Public = MultiSigner;
+	type Signature = Signature;
+}
+
+
 
 // =============================================///
 
@@ -488,7 +520,12 @@ construct_runtime!(
 		//Nft: orml_nft::{Pallet, Storage, Config<T>},
 		Proxy: pallet_proxy::{Pallet, Call, Storage, Event<T>},
 		Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>},
-		PaymentSystem: pallet_recurringpayments::{Pallet, Storage, Call, Event<T>},
+		//	Custom payment system 
+		Paymentgateway: paymentgateway::{Pallet, Storage, Call, Event<T>},
+		// 	Role based access control 
+		Authenticate: authenticate::{Pallet, Storage, Call, Event<T>, Config<T>},
+		//	This is the DID 
+		Identifier: identity::{Pallet, Call, Event<T>},
 	}
 );
 
