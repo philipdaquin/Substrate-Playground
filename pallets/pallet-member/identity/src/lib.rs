@@ -29,9 +29,6 @@ use sp_io::hashing::blake2_256;
 use sp_runtime::traits::{IdentifyAccount, Verify, Member};
 use crate::traits::*;
 
-
-
-
 #[frame_support::pallet]
 	pub mod pallet {
 	use scale_info::TypeInfo;

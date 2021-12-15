@@ -339,26 +339,6 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
-// impl pallet_kitties::Config for Runtime {
-// 	type Event = Event;
-// 	type Randomness = RandomnessCollectiveFlip;
-// 	type Currency = Balances;
-// 	type WeightInfo = weights::pallet_kitties::WeightInfo<Runtime>;
-// }
-
-// parameter_types! {
-// 	pub const MaxClassMetadata: u32 = 0;
-// 	pub const MaxTokenMetadata: u32 = 0;
-// }
-
-// impl orml_nft::Config for Runtime {
-// 	type ClassId = u32;
-// 	type TokenId = u32;
-// 	type ClassData = ();
-// 	type TokenData = pallet_kitties::Kitty;
-// 	type MaxClassMetadata = MaxClassMetadata;
-// 	type MaxTokenMetadata = MaxTokenMetadata;
-// }
 
 
 pub use pallet_proxy;
@@ -432,13 +412,12 @@ impl pallet_proxy::Config for Runtime {
 	type AnnouncementDepositBase = AnnouncementDepositBase;
 	type AnnouncementDepositFactor = AnnouncementDepositFactor;
 }
+
+//	Scheduler 
 pub use pallet_scheduler;
 parameter_types! {
 	pub const MaxScheduledPerBlock: u32 = 50;
-	// Retry a scheduled item every 10 blocks (1 minute) until the preimage exists.
-	//pub const NoPreimagePostponement: Option<u32> = Some(10);
 }
-
 impl pallet_scheduler::Config for Runtime {
 	type Event = Event;
 	type Origin = Origin;
@@ -448,17 +427,13 @@ impl pallet_scheduler::Config for Runtime {
 	type ScheduleOrigin = frame_system::EnsureRoot<AccountId>;
 	type MaxScheduledPerBlock = MaxScheduledPerBlock;
 	type WeightInfo = ();
-	//type OriginPrivilegeCmp = EqualPrivilegeOnly;
-	//type PreimageProvider = Preimage;
-	//type NoPreimagePostponement = NoPreimagePostponement;
 }
-
+//	Payment Gateway 
 pub use paymentgateway;
 parameter_types! { 
 	pub const StringLimit: u32 = 50;
 	pub const SubmissionDeposit: u128 = 10;
 }
-
 impl pallet_paymentgateway::Config for Runtime { 
 	type Event = Event;
 	type Currency = Balances;
@@ -470,32 +445,29 @@ impl pallet_paymentgateway::Config for Runtime {
 	type StringLimit = StringLimit;
 	type SubmissionDeposit = SubmissionDeposit;
 	type Scheduler = ScheduleOrigin<BlockNumber, Info, PalletsOrigin>;
-
 	//	pub const Trial = 7 * DAYSF; 
 	//	pub const Monthy = 7 * 
 	//	pub const Yearly 
-
-
 }
-
-
+//	Role based Access control 
 pub use authenticate;
 impl authenticate::Config for Runtime { 
 	type Event = Event;
-	type AddOrigin = = identity
+	type AddOrigin = membership::EnsureOrg<Runtime>;
 	
 }
-
+//	Decentralised Identifiers
 pub use identity;
 impl identity::Config for Runtime { 
 	type Event = Event;
 	type Public = MultiSigner;
 	type Signature = Signature;
 }
-
-
-
-// =============================================///
+//	Custom Origins for Members in an Organisation or Registrars
+pub use membership;
+impl membership::Config for Runtime { 
+	type Event = Event;
+}
 
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -515,10 +487,10 @@ construct_runtime!(
 		Sudo: pallet_sudo::{Pallet, Call, Config<T>, Storage, Event<T>},
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template::{Pallet, Call, Storage, Event<T>},
-		// Substrate Kitties pallet
-		//Kitties: pallet_kitties::{Pallet, Storage, Call, Event<T>, Config},
-		//Nft: orml_nft::{Pallet, Storage, Config<T>},
+		
+		//	Proxy Types
 		Proxy: pallet_proxy::{Pallet, Call, Storage, Event<T>},
+		//	Scheduler 
 		Scheduler: pallet_scheduler::{Pallet, Call, Storage, Event<T>},
 		//	Custom payment system 
 		Paymentgateway: paymentgateway::{Pallet, Storage, Call, Event<T>},
@@ -526,6 +498,8 @@ construct_runtime!(
 		Authenticate: authenticate::{Pallet, Storage, Call, Event<T>, Config<T>},
 		//	This is the DID 
 		Identifier: identity::{Pallet, Call, Event<T>},
+		//	Membership pallet that includes custom origin 
+		Membership: membership::{Pallet, Call, Storage, Event<T>},
 	}
 );
 
@@ -543,8 +517,14 @@ pub type SignedExtra = (
 	frame_system::CheckEra<Runtime>,
 	frame_system::CheckNonce<Runtime>,
 	frame_system::CheckWeight<Runtime>,
-	pallet_transaction_payment::ChargeTransactionPayment<Runtime>
+	pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+//	Custom Implementation 
+	authenticate::Authorize<Runtime>,
+
 );
+
+///	Extrinsic type that has already been checked 
+pub type CheckedExtrinsic = generic::CheckedExtrinsic<AccountId, Call, SignedExtra>;
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;
 /// Executive: handles dispatch to the various modules.
