@@ -26,10 +26,12 @@ pub type Dimensions = BTreeMap<Vec<u8>, Vec<u8>>;
 
 pub type CID = Vec<u8>;
 pub type ProductId = [u8; 16];
-
+pub const ONE_MINUTE: u64 = 60;
 #[frame_support::pallet]
 pub mod pallet {
-	use super::*;
+	use sp_runtime::traits::AtLeast32Bit;
+
+use super::*;
 	
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -44,7 +46,11 @@ pub mod pallet {
 		type Merchant: EnsureOrigin<Self::Origin>;
 		
 		type StringLimit: Get<u32>;
+
+		/// Type used for expressing timestamp.
+		type Moment: AtLeast32Bit + Parameter + Default + Copy + From<u64>;
 	}
+	
 	
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -57,7 +63,7 @@ pub mod pallet {
 		_,
 		Blake2_128Concat,
 		ProductId,
-		Vec<ProductInfo<T::UnixTime, BoundedVec<u8, T::StringLimit>>>,
+		ProductInfo<T::Moment, BoundedVec<u8, T::StringLimit>>,
 		ValueQuery,
 	>;
 	// Store Product Ids owned by an organisation
@@ -79,20 +85,20 @@ pub mod pallet {
 		ProductCreated {
 			product_id: ProductId,
 			object_type: ObjectType,
-			created_at: T::UnixTime,
+			created_at: T::Moment,
 			livemode: bool,
 		},
 		// Occurs whenever a Product is deleted 
 		ProductDeleted {
 			product_id: ProductId,
 			object_type: ObjectType,	
-			created_at: T::UnixTime,
+			created_at: T::Moment,
 			live: bool,
 		},
 		// Occurs whenever a Product is updated
 		ProductUpdated {
 			product_id: ProductId,
-			updated_at: T::UnixTime,
+			updated_at: T::Moment,
 			active: bool,
 			name: Vec<u8>,
 			description: Vec<u8>,
@@ -105,7 +111,7 @@ pub mod pallet {
 			id: ProductId,
 			object:  ObjectType, 
 			active: bool,
-			created_at: T::UnixTime,
+			created_at: T::Moment,
 			description: Vec<u8>,
 			ipfs_cid: CID,
 			livemode: bool,
@@ -113,23 +119,11 @@ pub mod pallet {
 			package_dimensions: Option<Dimensions>,
 			shippable: bool,
 			unit_label: u32,
-			updated_at: T::UnixTime,
+			updated_at: T::Moment,
 			url: Vec<u8>,
 		},
 		ListAllProducts { 
-			id: ProductId,
-			object:  ObjectType, 
-			active: bool,
-			created_at: T::UnixTime,
-			description: Vec<u8>,
-			ipfs_cid: CID,
-			livemode: bool,
-			product_name: Vec<u8>,
-			package_dimensions: Option<Dimensions>,
-			shippable: bool,
-			unit_label: u32,
-			updated_at: T::UnixTime,
-			url: Vec<u8>,
+			id: Vec<ProductId>,
 		}
 	}
 
@@ -156,6 +150,7 @@ pub mod pallet {
 		#[pallet::weight(10)]
 		pub fn create_product(
 			origin: OriginFor<T>,
+			merchant: T::AccountId,
 			active: bool,
 			name: Vec<u8>,
 			description: Vec<u8>,
@@ -166,8 +161,7 @@ pub mod pallet {
 			unit_label: u32,
 			product_url: Vec<u8>	
 		) -> DispatchResult { 
-			let merchant = T::Merchant::ensure_origin(origin)?;
-			
+			T::Merchant::ensure_origin(origin)?;
 			Self::do_create(
 				merchant,
 				active,
@@ -190,12 +184,13 @@ pub mod pallet {
 		pub fn retrieve_product(
 			origin: OriginFor<T>,
 			product_id: ProductId,
+			merchant: T::AccountId,
 		) -> DispatchResult { 
-			let merchant = T::Merchant::ensure_origin(origin)?;
-			Self::verify_product_owner(merchant, product_id)?;
+			T::Merchant::ensure_origin(origin)?;
 			
-		
-			let ProductInfo::<T::UnixTime, BoundedVec<u8, T::StringLimit>> {
+			Self::verify_product_owner(merchant, product_id)?;
+
+			let ProductInfo { 
 				id,
 				object, 
 				active,
@@ -209,7 +204,7 @@ pub mod pallet {
 				unit_label,
 				updated_at,
 				url,
-			} = ProductList::<T>::get(&product_id);
+			} = ProductList::<T>::get(product_id);
 
 			Self::deposit_event(Event::RetrieveProduct { 
 				id,
@@ -234,6 +229,7 @@ pub mod pallet {
 		#[pallet::weight(10)]
 		pub fn update_product(
 			origin: OriginFor<T>,
+			merchant: T::AccountId,
 			product_id: ProductId,
 			active: bool,
 			name: Vec<u8>,
@@ -245,38 +241,39 @@ pub mod pallet {
 			unit_label: u32,
 			product_url: Vec<u8>
 		) -> DispatchResult { 
-			let merchant = T::Merchant::ensure_origin(origin)?;
+			T::Merchant::ensure_origin(origin)?;
 
 			//	Check organisation and product owners 
 			Self::verify_product_owner(merchant, product_id)?;
 			//	Find the product in the product list 
-			ProductList::<T>::mutate(&product_id, |info| -> DispatchResult { 
-				let details = info.as_mut().ok_or(Error::<T>::Unknown)?;
-
-				let bounded_name: BoundedVec<u8, T::StringLimit> =
-					name.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
+			let bounded_name: BoundedVec<u8, T::StringLimit> =
+				name.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
+		
+			let bounded_url: BoundedVec<u8, T::StringLimit> =
+				product_url.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
+		
+			let bounded_description: BoundedVec<u8, T::StringLimit> =
+				description.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
+			let now = Self::get_time();
 			
-				let bounded_url: BoundedVec<u8, T::StringLimit> =
-					product_url.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
-			
-				let bounded_description: BoundedVec<u8, T::StringLimit> =
-					description.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
-				let time_now: T::UnixTime = T::UnixTime::now();
+			ProductList::<T>::try_mutate_exists(product_id, |info| -> DispatchResult { 
+				let mut details = info.as_mut().ok_or(Error::<T>::Unknown)?;
 				
 				details.active = active;
-				details.name = bounded_name.clone();
-				details.description = bounded_description.clone();
+				details.product_name = bounded_name;
+				details.description = bounded_description;
 				details.package_dimensions = package_dimensions;
 				details.livemode = livemode;
 				details.ipfs_cid = ipfs_cid;
 				details.shippable = shippable;
 				details.unit_label = unit_label;
-				details.product_url = bounded_url.clone();
-				details.updated_at = time_now.clone();
+				details.url = bounded_url;
 
+				*info = Some(details);
+				
 				Self::deposit_event(Event::ProductUpdated {
 					product_id,
-					updated_at: time_now,
+					updated_at: now,
 					active,
 					name,
 					description,
@@ -295,54 +292,25 @@ pub mod pallet {
 		/// Only return products that are active or inactive
 		#[pallet::weight(10)]
 		pub fn list_all_products(
-			origin: OriginFor<T>
+			origin: OriginFor<T>,
+			merchant: T::AccountId,
 		) -> DispatchResult { 
-			let merchant = T::Merchant::ensure_origin(origin)?;
-			let org_list = OrganisationProduct::<T>::get(&merchant);
-			
+			T::Merchant::ensure_origin(origin)?;
+			let mut org_list = OrganisationProduct::<T>::get(merchant);
 			//	Iterate through ProductIds and get each ProductInfo
-			for products in org_list { 
-				let ProductInfo::<T::UnixTime, BoundedVec<u8, T::StringLimit>> {
-					id,
-					object, 
-					active,
-					created_at,
-					description,
-					ipfs_cid,
-					livemode,
-					product_name,
-					package_dimensions,
-					shippable,
-					unit_label,
-					updated_at,
-					url,
-				} = ProductList::<T>::get(products);
-				
-				//	Emit event for each
-				Self::deposit_event(Event::ListAllProducts { 
-					id,
-					object, 
-					active,
-					created_at,
-					description,
-					ipfs_cid,
-					livemode,
-					product_name,
-					package_dimensions,
-					shippable,
-					unit_label,
-					updated_at,
-					url,
-				});				
-			}
-
+			
+			//	Emit event for each
+			Self::deposit_event(Event::ListAllProducts { 
+				id: org_list
+			});				
+			
 			Ok(())
 		}
 		#[pallet::weight(10)]
 		pub fn delete_product(
 			origin: OriginFor<T>
 		) -> DispatchResult { 
-			let merchant = T::Merchant::ensure_origin(origin)?;
+			T::Merchant::ensure_origin(origin)?;
 
 			Ok(())
 		}
@@ -357,19 +325,21 @@ pub mod pallet {
 			);
 			payload.using_encoded(blake2_128)
 		}
-		fn product_owner(product_id: ProductId) -> T::AccountId { 
+		fn product_owner(product_id: ProductId) -> Result<T::AccountId, DispatchError> { 
 			//	Check if the Product List contains the id
-			ensure!(!ProductList::<T>::contains_key(&product_id), Error::<T>::ProductDoesNotExist);
+			ensure!(!ProductList::<T>::contains_key(product_id), Error::<T>::ProductDoesNotExist);
 			//	Check if there are owners for this id
 			ensure!(!OwnerOf::<T>::contains_key(&product_id), Error::<T>::NoOwnerFound);
 			
 			match OwnerOf::<T>::get(product_id) { 
-				Some(id) => id,
-				None => { return Err(Error::<T>::NoOwnerFound.into())}
+				Some(id) => Ok(id),
+				None => {
+					return Err(Error::<T>::Unknown.into())
+				}
 			}
 		}
 		fn verify_product_owner(merchant: T::AccountId, product_id: ProductId) -> DispatchResult {
-			let owner = Self::product_owner(product_id);
+			let owner = Self::product_owner(product_id)?;
 
 			match owner == merchant { 
 				true => {
@@ -384,15 +354,13 @@ pub mod pallet {
 		}
 		fn store_product(
 			product_id: ProductId, 
-			product_info: ProductInfo<T::UnixTime, BoundedVec<u8, T::StringLimit>>, 
+			product_info: ProductInfo<T::Moment, BoundedVec<u8, T::StringLimit>>, 
 			merchant: T::AccountId,
 		) -> DispatchResult { 
 			
-
-
-			ProductList::<T>::insert(&product_id, product_info);
+			ProductList::<T>::insert(product_id, product_info);
 			OrganisationProduct::<T>::append(&merchant, &product_id);
-			OwnerOf::<T>::insert(&product_id, &merchant);
+			OwnerOf::<T>::insert(&product_id, Some(merchant));
 			
 			Ok(())
 		}
@@ -409,7 +377,7 @@ pub mod pallet {
 			product_url: Vec<u8>,
 		) -> DispatchResult { 
 			let id = Self::get_id();
-			let now = T::UnixTime::now();
+			let now = Self::get_time();
 			
 			let bounded_name: BoundedVec<u8, T::StringLimit> =
 				name.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
@@ -420,7 +388,7 @@ pub mod pallet {
 			let bounded_description: BoundedVec<u8, T::StringLimit> =
 				description.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
 			
-			let product_info = ProductInfo {
+			let product_info = ProductInfo::<T::Moment, BoundedVec<u8, T::StringLimit>> {
 					 id,
 					 object: ObjectType::Product, 
 					 active,
@@ -436,7 +404,7 @@ pub mod pallet {
 					 url: bounded_url,
 			};
 			//	Write to Db
-			Self::store_product(&id, product_info.clone(), merchant);
+			Self::store_product(id, product_info, merchant);
 
 			Self::deposit_event(Event::ProductCreated {
 				product_id: id,
@@ -446,6 +414,12 @@ pub mod pallet {
 			});
 			
 			Ok(())	
+		}
+		fn get_time() -> T::Moment { 
+			let now_as_mins: T::Moment = (T::UnixTime::now().as_secs() / ONE_MINUTE).into();
+			// Truncate seconds, keep minutes
+			let now_as_secs: T::Moment = now_as_mins * ONE_MINUTE.into();
+			now_as_secs
 		}
 	}
 }
