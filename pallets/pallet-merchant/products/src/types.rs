@@ -13,7 +13,6 @@ pub enum ObjectType {
 	Subscription,
 	Event,
 }
-
 #[derive(Encode, Decode, Default, PartialEq, Eq, RuntimeDebug, TypeInfo)]
 pub struct ProductInfo<Moment, BoundedString> { 
 	pub id: ProductId,
