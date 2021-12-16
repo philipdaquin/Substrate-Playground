@@ -201,7 +201,7 @@ version = '4.0.0-dev'
 # Payment Gateway
 [dependencies.paymentgateway]
 default-features = false
-path = '../pallets/paymentgateway'
+path = '../pallets/pallet-merchant/paymentgateway'
 
 # Pallet - Members: 
 [dependencies.authenticate]
