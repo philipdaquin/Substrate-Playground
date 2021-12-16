@@ -24,6 +24,7 @@ members = [
      #'pallets/pallet-member/authenticate',
      'pallets/pallet-member/*',
      'pallets/pallet-shop/*',
+     'pallets/pallet-merchant/*'
      
 
 
