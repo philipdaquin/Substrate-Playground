@@ -198,10 +198,22 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
-# Payment Gateway
+# Payment Merchant
 [dependencies.paymentgateway]
 default-features = false
 path = '../pallets/pallet-merchant/paymentgateway'
+
+[dependencies.products]
+default-features = false
+path = '../pallets/pallet-merchant/products'
+
+[dependencies.prices]
+default-features = false
+path = '../pallets/pallet-merchant/prices'
+
+[dependencies.invoices]
+default-features = false
+path = '../pallets/pallet-merchant/invoices'
 
 # Pallet - Members: 
 [dependencies.authenticate]
@@ -269,8 +281,13 @@ std = [
     'sp-transaction-pool/std',
     'sp-version/std',
     
+    #Pallet Merchants
     'paymentgateway/std',
-
+    'products/std',
+    'prices/std',
+    'invoices/std',
+    
+    #Pallet Members
     'authenticate/std',
     'identity/std',
     'membership/std',

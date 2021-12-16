@@ -1,6 +1,5 @@
 use super::*;
 
-
 pub enum ObjectType {
 	Product,
 	Person,
