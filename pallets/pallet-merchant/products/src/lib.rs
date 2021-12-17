@@ -106,7 +106,7 @@ use super::*;
 			description: Vec<u8>,
 			livemode: bool,
 			shippable: bool,
-			unit_label: u32,
+			unit_label:  Vec<u8>,
 			product_url: Vec<u8>,
 		},
 		RetrieveProduct { 
@@ -120,7 +120,7 @@ use super::*;
 			product_name: Vec<u8>,
 			package_dimensions: Option<Dimensions>,
 			shippable: bool,
-			unit_label: u32,
+			unit_label: Vec<u8>,
 			updated_at: T::Moment,
 			url: Vec<u8>,
 		},
@@ -167,7 +167,7 @@ use super::*;
 			livemode: bool,
 			ipfs_cid: CID,
 			shippable: bool,
-			unit_label: u32,
+			unit_label: Vec<u8>,
 			product_url: Vec<u8>	
 		) -> DispatchResult { 
 			T::Merchant::ensure_origin(origin)?;
@@ -226,7 +226,7 @@ use super::*;
 				product_name: product_name.to_vec(),
 				package_dimensions,
 				shippable,
-				unit_label,
+				unit_label: unit_label.to_vec(),
 				updated_at,
 				url: url.to_vec(),
 			});
@@ -247,7 +247,7 @@ use super::*;
 			livemode: bool,
 			ipfs_cid: CID,
 			shippable: bool,
-			unit_label: u32,
+			unit_label: Vec<u8>,
 			product_url: Vec<u8>
 		) -> DispatchResult { 
 			T::Merchant::ensure_origin(origin)?;
@@ -265,6 +265,9 @@ use super::*;
 				description.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
 			let now = Self::get_time();
 			
+			let bounded_label: BoundedVec<u8, T::StringLimit> =
+				unit_label.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
+
 			ProductList::<T>::try_mutate_exists(product_id, |info| -> DispatchResult { 
 				let mut details = info.take().ok_or(Error::<T>::Unknown)?;
 				
@@ -275,7 +278,7 @@ use super::*;
 				details.livemode = livemode;
 				details.ipfs_cid = ipfs_cid;
 				details.shippable = shippable;
-				details.unit_label = unit_label;
+				details.unit_label = bounded_label;
 				details.url = bounded_url;
 
 				*info = Some(details);
@@ -336,7 +339,9 @@ use super::*;
 			
 			id_list.remove(index);
 			let now = Self::get_time();
-			
+
+			OrganisationProduct::<T>::insert(merchant.clone(), id_list);
+
 			Self::deposit_event(Event::DeleteProduct {
 				id: product_id,
 				merchant: merchant.clone(),
@@ -404,7 +409,7 @@ use super::*;
 			livemode: bool,
 			ipfs_cid: CID,
 			shippable: bool,
-			unit_label: u32,
+			unit_label: Vec<u8>,
 			product_url: Vec<u8>,
 		) -> DispatchResult { 
 			let id = Self::get_id();
@@ -419,6 +424,9 @@ use super::*;
 			let bounded_description: BoundedVec<u8, T::StringLimit> =
 				description.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;
 			
+			let bounded_label: BoundedVec<u8, T::StringLimit> =
+			unit_label.clone().try_into().map_err(|_| Error::<T>::BadMetadata)?;	
+
 			let product_info = ProductInfo::<T::Moment, BoundedVec<u8, T::StringLimit>> {
 					 id,
 					 object: ObjectType::Product, 
@@ -430,7 +438,7 @@ use super::*;
 					 product_name: bounded_name,
 					 package_dimensions, 
 					 shippable,
-					 unit_label,
+					 unit_label: bounded_label,
 					 updated_at: now,
 					 url: bounded_url,
 			};

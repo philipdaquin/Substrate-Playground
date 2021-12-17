@@ -60,6 +60,28 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
+[dependencies.orml-currencies]
+default-feaures = false
+version = '0.4.1-dev'
+git = 'https://github.com/open-web3-stack/open-runtime-module-library.git'
+
+[dependencies.orml-tokens]
+default-feaures = false
+version = '0.4.1-dev'
+git = 'https://github.com/open-web3-stack/open-runtime-module-library.git'
+
+
+[dependencies.orml-traits]
+default-feaures = false
+version = '0.4.1-dev'
+git = 'https://github.com/open-web3-stack/open-runtime-module-library.git'
+
+[dependencies.orml-utilities]
+default-feaures = false
+version = '0.4.1-dev'
+git = 'https://github.com/open-web3-stack/open-runtime-module-library.git'
+
+
 [features]
 default = ['std']
 runtime-benchmarks = ['frame-benchmarking']
@@ -69,5 +91,10 @@ std = [
     'frame-support/std',
     'frame-system/std',
     'frame-benchmarking/std',
+    
+    'orml-utilities/std',
+    'orml-traits/std',
+    'orml-tokens/std',
+    'orml-currencies/std',
 ]
 try-runtime = ['frame-support/try-runtime']
