@@ -17,7 +17,7 @@ mod benchmarking;
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
-	use frame_system::pallet_prelude::*;
+	use frame_system::{pallet_prelude::*, RawOrigin};
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -63,5 +63,22 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		
+	}
+	impl<T: Config> Pallet<T> { 
+		fn ensure_root_or_signed(
+			origin: T::Origin
+		) -> Result<RawOrigin<T::AccountId>, DispatchError> { 
+			match origin.into() { 
+				Ok(frame_system::RawOrigin::Root) => Ok(
+					frame_system::RawOrigin::Root
+				),
+				Ok(frame_system::RawOrigin::Signed(acc)) => Ok(
+					frame_system::RawOrigin::Signed(acc)
+				),
+				_ => { 
+					return Err(sp_runtime::DispatchError::BadOrigin)
+				}
+			}
+		}
 	}
 }
