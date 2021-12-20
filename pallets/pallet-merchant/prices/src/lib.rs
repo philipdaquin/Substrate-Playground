@@ -4,27 +4,58 @@
 /// Learn more about FRAME and the core library of Substrate FRAME pallets:
 /// <https://docs.substrate.io/v3/runtime/frame>
 pub use pallet::*;
+use orml_traits::{MultiCurrency, MultiReservableCurrency};
+use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Randomness};
+use frame_system::{pallet_prelude::*, RawOrigin};
+use orml_currencies::Currency;
 
+	
 #[cfg(test)]
 mod mock;
-
 #[cfg(test)]
 mod tests;
-
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
-	use frame_system::{pallet_prelude::*, RawOrigin};
+	use sp_io::hashing::blake2_128;
 
+use super::*;
+	
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
+		// Used to represent Currency Id and Balances 
+		type Currency: MultiReservableCurrency<Self::AccountId>;
+		// Used to generate Price Id
+		type IdRandomness: Randomness<Self::Hash, Self::BlockNumber>;
+		// Used to limit Strings
+		type StringLimit: Get<u32>;
+		// Origin from which the Prices are set at
+		type Merchant: EnsureOrigin<Self::Origin>;
+		// The basic amount of funds that must be reserved for the transaction
+		type FlatFee: Get<DepositBalanceOf<Self>>;
+		
+		// Recurring Intervals:
+		//	As Specified on Runtime, Intervals are measured as blocks
+		type Months: Get<Self::BlockNumber>;
+		//	YEARS: BlockNumber = MONTHS * 12;
+		type Year: Get<Self::BlockNumber>;
+		//	 WEEKS: BlockNumber = DAYS * 7;
+		type Week: Get<Self::BlockNumber>;
+		//	DAYS: BlockNumber = HOURS * 24;
+		type Day: Get<Self::BlockNumber>;
 	}
+	// Used to represent Prices 
+	pub type BalanceOf<T> = <<T as Config>::Currency as MultiCurrency<<T as frame_system::Config>::AccountId>>::Balance;
+	// used to represent Currency Ids
+	pub type CurrencyIdOf<T> = <<T as Config>::Currency as MultiCurrency<<T as frame_system::Config>::AccountId>>::CurrencyId;
+	//	Deposit Balance for Graduate/ Volume pricing models 
+	pub type DepositBalanceOf<T> =
+	<<T as Config>::Currency as MultiCurrency<<T as frame_system::Config>::AccountId>>::Balance;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
@@ -79,6 +110,13 @@ pub mod pallet {
 					return Err(sp_runtime::DispatchError::BadOrigin)
 				}
 			}
+		}
+		fn get_id() -> [u8; 16] {
+			let payload = (
+				T::IdRandomness::random(&b"priceid"[..]).0,
+				frame_system::Pallet::<T>::block_number(),
+			);
+			payload.using_encoded(blake2_128)
 		}
 	}
 }
