@@ -130,5 +130,10 @@ use super::*;
 				Interval::Year => T::Year
 			}
 		}
+		fn convert_string(string: Vec<u8>) -> BoundedVec<u8, T::StringLimit> { 
+			let mut bounded_string: BoundedVec<u8, T::StringLimit> =
+				string.clone().try_into().map_err(Error::<T>::BadMetadata);
+			bounded_string
+		}
 	}
 }
