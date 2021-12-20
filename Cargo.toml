@@ -22,8 +22,8 @@ members = [
       #'pallets/sumstorage',
      #'pallets/pallet-member/membership',
      #'pallets/pallet-member/authenticate',
-     'pallets/pallet-member/*',
-     'pallets/pallet-shop/*',
+     #'pallets/pallet-member/*',
+    # 'pallets/pallet-shop/*',
      'pallets/pallet-merchant/*'
      
 

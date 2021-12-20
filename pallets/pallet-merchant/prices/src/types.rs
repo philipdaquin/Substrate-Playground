@@ -1,25 +1,31 @@
 
-
-
-pub struct Price<Moment, Balance, CurrencyId> {
+use super::*;
+//  Prices define the unit cost, currency and billing cycle for 
+//  recurring and one time purchases of products 
+#[derive(Encode, Decode, Default, Debug, Eq, PartialEq, Clone, PartialOrd, Ord)]
+pub struct Price<Moment, BalanceOf, CurrencyId> {
+    // Identifier for associated for Price/ billing 
 	pub id: PriceId,
+    //  Identifier type 
 	pub object: Object,
-	pub billing_scheme: BillingScheme,
-	#[codec(compact)]
+    //  Describes how to compute the price per period, can either be: Per_unit or Tiered
+    //  'Per Unit' indicates that the fixed amount will be charged per unit in quantity (for plans == licencesed)
+    pub billing_scheme: BillingScheme,
+    #[codec(compact)]
 	pub created_at: Moment,
-	pub currency: CurrencyId,
-	pub livemode: bool,
-	description: Vec<u8>,
-	pub product: ProductId, 
+    pub currency: CurrencyId,
+    pub livemode: bool,
+    description: Vec<u8>,
+    pub product: ProductId, 
 	//pub recurring: Option<Recurring>, 
-	pub tiers_mode: Option<TiersMode>,
-	pub purchase_type: Type,
+    pub tiers_mode: Option<TiersMode<DepositBalance, Balance>>,
+    pub purchase_type: Type,
 	// Represent how much to charge:
-	#[codec(compact)]
+    #[codec(compact)]
 	pub unit_amount: Balance,
-	pub unit_amount_decimal: Option<Decimal>,
+    pub unit_amount_decimal: Option<Decimal>,
 }
-
+//  Represented as BlockNumbers
 pub enum Interval {
 	Month,
 	Year,
@@ -53,12 +59,14 @@ pub enum BillingScheme {
 	Per_unit,
 	Tiered
 }
-pub enum Type<Balance> {
+pub enum Type<Balance, BlockNumber> {
 	OneTime(Balance),
 	Recurring {
 		aggregated_usage: UsageTypes,
-		interval: Interval,
+        intevval: Interval,
+		interval_as_blocknumber: BlockNumber,
 		interval_count: u32,
 		usage_type: UsageTypes
 	}
 }
+

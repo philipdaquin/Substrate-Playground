@@ -9,7 +9,10 @@ use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Randomn
 use frame_system::{pallet_prelude::*, RawOrigin};
 use orml_currencies::Currency;
 
-	
+
+mod types;
+use crate::types::*;
+
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
@@ -38,10 +41,9 @@ use super::*;
 		type Merchant: EnsureOrigin<Self::Origin>;
 		// The basic amount of funds that must be reserved for the transaction
 		type FlatFee: Get<DepositBalanceOf<Self>>;
-		
 		// Recurring Intervals:
 		//	As Specified on Runtime, Intervals are measured as blocks
-		type Months: Get<Self::BlockNumber>;
+		type Month: Get<Self::BlockNumber>;
 		//	YEARS: BlockNumber = MONTHS * 12;
 		type Year: Get<Self::BlockNumber>;
 		//	 WEEKS: BlockNumber = DAYS * 7;
@@ -49,6 +51,8 @@ use super::*;
 		//	DAYS: BlockNumber = HOURS * 24;
 		type Day: Get<Self::BlockNumber>;
 	}
+	//	Identifier
+	pub type PriceId = [u8; 16];
 	// Used to represent Prices 
 	pub type BalanceOf<T> = <<T as Config>::Currency as MultiCurrency<<T as frame_system::Config>::AccountId>>::Balance;
 	// used to represent Currency Ids
@@ -117,6 +121,14 @@ use super::*;
 				frame_system::Pallet::<T>::block_number(),
 			);
 			payload.using_encoded(blake2_128)
+		}
+		fn convert(interval: Interval) -> T::BlockNumber { 
+			match interval { 
+				Interval::Month => T::Month,
+				Interval::Week => T::Week,
+				Interval::Day => T::Day,
+				Interval::Year => T::Year
+			}
 		}
 	}
 }

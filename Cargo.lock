@@ -4666,6 +4666,7 @@ dependencies = [
  "orml-traits",
  "orml-utilities",
  "parity-scale-codec",
+ "products",
  "scale-info",
  "sp-core 4.0.0-dev (git+https://github.com/paritytech/substrate.git?tag=monthly-2021-11-1)",
  "sp-io 4.0.0-dev (git+https://github.com/paritytech/substrate.git?tag=monthly-2021-11-1)",

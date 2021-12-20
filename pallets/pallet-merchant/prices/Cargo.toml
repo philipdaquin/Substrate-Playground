@@ -60,6 +60,12 @@ git = 'https://github.com/paritytech/substrate.git'
 tag = 'monthly-2021-11-1'
 version = '4.0.0-dev'
 
+
+[dependencies.products]
+default-features = false
+package = 'products'
+path = '../products'
+
 [dependencies.orml-currencies]
 default-feaures = false
 version = '0.4.1-dev'
@@ -69,7 +75,6 @@ git = 'https://github.com/open-web3-stack/open-runtime-module-library.git'
 default-feaures = false
 version = '0.4.1-dev'
 git = 'https://github.com/open-web3-stack/open-runtime-module-library.git'
-
 
 [dependencies.orml-traits]
 default-feaures = false
@@ -96,5 +101,6 @@ std = [
     'orml-traits/std',
     'orml-tokens/std',
     'orml-currencies/std',
+    'products/std',
 ]
 try-runtime = ['frame-support/try-runtime']
