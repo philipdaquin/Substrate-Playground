@@ -4434,6 +4434,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0744126afe1a6dd7f394cb50a716dbe086cb06e255e53d8d0185d82828358fb5"
 
 [[package]]
+name = "payment"
+version = "4.0.0-dev"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support 4.0.0-dev (git+https://github.com/paritytech/substrate.git?tag=monthly-2021-11-1)",
+ "frame-system 4.0.0-dev (git+https://github.com/paritytech/substrate.git?tag=monthly-2021-11-1)",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core 4.0.0-dev (git+https://github.com/paritytech/substrate.git?tag=monthly-2021-11-1)",
+ "sp-io 4.0.0-dev (git+https://github.com/paritytech/substrate.git?tag=monthly-2021-11-1)",
+ "sp-runtime 4.0.0-dev (git+https://github.com/paritytech/substrate.git?tag=monthly-2021-11-1)",
+]
+
+[[package]]
 name = "paymentgateway"
 version = "4.0.0-dev"
 dependencies = [
