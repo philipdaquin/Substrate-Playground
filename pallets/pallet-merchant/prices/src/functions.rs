@@ -2,7 +2,6 @@ use super::*;
 
 impl<T: Config> Price<T> { 
 	pub fn new(
-		id: PriceId, 
 		object: Object, 
 		billing_scheme: BillingScheme,
 		created_by: T::Account,
@@ -13,7 +12,7 @@ impl<T: Config> Price<T> {
 		tier_mode: Option<TiersMode<DepositBalance, Balance>>,
 		puchase_type: Type, 
 		unit_amount: Balance, 
-		unit_amoutn_decimal: Option<Decimal>,
+		unit_amount_decimal: Option<Decimal>,
 	) -> Self { 
 		Price { 
 			id: Self::get_id(),

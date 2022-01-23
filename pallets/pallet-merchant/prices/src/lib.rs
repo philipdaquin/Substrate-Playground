@@ -23,9 +23,7 @@ pub mod functions;
 #[frame_support::pallet]
 pub mod pallet {
 	use sp_io::hashing::blake2_128;
-
 	use super::*;
-	
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
@@ -82,7 +80,16 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
-		SomethingStored(u32, T::AccountId),
+		PriceCreated { 
+
+		},
+		PriceDeleted { 
+
+		},
+		PriceUpdated { 
+
+		},
+
 	}
 
 	// Errors inform users that something went wrong.
@@ -102,9 +109,34 @@ pub mod pallet {
 		#[pallet::weight(10000)]
 		pub fn create_price(
 			origin: OriginFor<T>,
+			currency: CurrencyIdOf<T>,
+			livemode: bool,
+			product: ProductId,
+			description: Vec<u8>,
+			tier_mode: Option<Tiersmode<DepositBalance, Balance>>,
+			purchase_type: Type, 
+			unit_amount: Balance,
+			unit_amount_decimal: Option<Decimal>,
 		) -> DispatchResult { 
+			let sender = ensure_origin(origin);
+			let new_price = Price::<T>::new(
+				object, 
+				billing_scheme, 
+				created_by, 
+				currency, 
+				livemode, 
+				product, 
+				description, 
+				tier_mode, 
+				puchase_type, 
+				unit_amount, 
+				unit_amount_decimal
+			);
+			Self::deposit_event(PriceCreated {
+				 
+			});
 
-			Ok(())
+			Ok(()) 
 		}
 
 

@@ -15,6 +15,7 @@ pub struct Price<Moment, BalanceOf, CurrencyId> {
     pub billing_scheme: BillingScheme,
     #[codec(compact)]
 	pub created_at: Moment,
+	//	Must be supported Currency 
     pub currency: CurrencyId,
     pub livemode: bool,
     description: Vec<u8>,
