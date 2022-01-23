@@ -5,7 +5,7 @@
 /// <https://docs.substrate.io/v3/runtime/frame>
 pub use pallet::*;
 use orml_traits::{MultiCurrency, MultiReservableCurrency};
-use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::Randomness};
+use frame_support::{dispatch::DispatchResult, pallet_prelude::*, traits::{Randomness, UnixTime}};
 use frame_system::{pallet_prelude::*, RawOrigin};
 use orml_currencies::Currency;
 
@@ -13,18 +13,18 @@ use orml_currencies::Currency;
 mod types;
 use crate::types::*;
 
-#[cfg(test)]
-mod mock;
-#[cfg(test)]
-mod tests;
-#[cfg(feature = "runtime-benchmarks")]
-mod benchmarking;
+// #[cfg(test)]
+// mod mock;
+// #[cfg(test)]
+// mod tests;
+// #[cfg(feature = "runtime-benchmarks")]
 
+pub mod functions;
 #[frame_support::pallet]
 pub mod pallet {
 	use sp_io::hashing::blake2_128;
 
-use super::*;
+	use super::*;
 	
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -39,6 +39,8 @@ use super::*;
 		type StringLimit: Get<u32>;
 		// Origin from which the Prices are set at
 		type Merchant: EnsureOrigin<Self::Origin>;
+		//	UnixTime
+		type UnixTime: UnixTime;
 		// The basic amount of funds that must be reserved for the transaction
 		type FlatFee: Get<DepositBalanceOf<Self>>;
 		// Recurring Intervals:
@@ -97,47 +99,17 @@ use super::*;
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		
-		
+		#[pallet::weight(10000)]
+		pub fn create_price(
+			origin: OriginFor<T>,
+		) -> DispatchResult { 
+
+			Ok(())
+		}
+
 
 
 
 	}
-	impl<T: Config> Pallet<T> { 
-		fn ensure_root_or_signed(
-			origin: T::Origin
-		) -> Result<RawOrigin<T::AccountId>, DispatchError> { 
-			match origin.into() { 
-				Ok(frame_system::RawOrigin::Root) => Ok(
-					frame_system::RawOrigin::Root
-				),
-				Ok(frame_system::RawOrigin::Signed(acc)) => Ok(
-					frame_system::RawOrigin::Signed(acc)
-				),
-				_ => { 
-					return Err(sp_runtime::DispatchError::BadOrigin)
-				}
-			}
-		}
-		fn get_id() -> [u8; 16] {
-			let payload = (
-				T::IdRandomness::random(&b"priceid"[..]).0,
-				frame_system::Pallet::<T>::block_number(),
-			);
-			payload.using_encoded(blake2_128)
-		}
-		fn convert(interval: Interval) -> T::BlockNumber { 
-			match interval { 
-				Interval::Month => T::Month,
-				Interval::Week => T::Week,
-				Interval::Day => T::Day,
-				Interval::Year => T::Year
-			}
-		}
-		fn convert_string(string: Vec<u8>) -> BoundedVec<u8, T::StringLimit> { 
-			let mut bounded_string: BoundedVec<u8, T::StringLimit> =
-				string.clone().try_into().map_err(Error::<T>::BadMetadata);
-			bounded_string
-		}
-	}
+	
 }

@@ -23,7 +23,6 @@ mod benchmarking;
 use sp_io::hashing::blake2_128;
 
 pub type Dimensions = BTreeMap<Vec<u8>, Vec<u8>>;
-
 pub type CID = Vec<u8>;
 pub type ProductId = [u8; 16];
 pub const ONE_MINUTE: u64 = 60;

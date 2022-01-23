@@ -8,6 +8,8 @@ pub struct Price<Moment, BalanceOf, CurrencyId> {
 	pub id: PriceId,
     //  Identifier type 
 	pub object: Object,
+	// Created by who, and when 
+	pub created_by: CreatedBy<T>,
     //  Describes how to compute the price per period, can either be: Per_unit or Tiered
     //  'Per Unit' indicates that the fixed amount will be charged per unit in quantity (for plans == licencesed)
     pub billing_scheme: BillingScheme,
@@ -70,3 +72,8 @@ pub enum Type<Balance, BlockNumber> {
 	}
 }
 
+pub struct CreatedBy<T: Config> { 
+	pub account_id: T::AccountId,
+	pub blocknumber: T::BlockNumber,
+	pub time: T::Moment,
+}
