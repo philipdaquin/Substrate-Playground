@@ -65,14 +65,48 @@ pub mod pallet {
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/v3/runtime/storage
+	// PriceId -> ProductId
 	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/v3/runtime/storage#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+	#[pallet::getter(fn price_to)]
+	pub type PricedFor<T: Config> = StorageMap<
+		_, 
+		Blake2_128Concat,
+		PriceId, 
+		ProductId, 
+		ValueQuery,
+	>;
+	//	Account Id -> Option<PriceId>
+	#[pallet::storage]
+	#[pallet::getter(fn organisation_price)]
+	pub type OrganisationPrice<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		T::AccountId, 
+		Option<PriceId>,
+		ValueQuery,
+	>;
+	//	
+	#[pallet::storage]
+	#[pallet::getter(fn price_to_id)]
+	pub type PriceList<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		PriceId,
+		Price<Moment, BalanceOf, CurrencyId>,
+		ValueQuery,
+	>;
+	// Storage Helper
+	#[pallet::storage]
+	#[pallet::getter(fn owner_of_prices)]
+	pub type PriceIdOwner<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		PriceId, 
+		Option<T::AccountId>,
+		ValueQuery
+	>;
 
+ 
 	// Pallets use events to inform users when important changes are made.
 	// https://docs.substrate.io/v3/runtime/events-and-errors
 	#[pallet::event]
@@ -81,7 +115,11 @@ pub mod pallet {
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
 		PriceCreated { 
-
+			created_by: T::AccountId,
+			unit_amount: BalanceOf<T>, 
+			currency: CurrencyId<T>,
+			purchase_type: Type,
+			product_id: ProductId, 
 		},
 		PriceDeleted { 
 
@@ -133,7 +171,7 @@ pub mod pallet {
 				unit_amount_decimal
 			);
 			Self::deposit_event(PriceCreated {
-				 
+
 			});
 
 			Ok(()) 

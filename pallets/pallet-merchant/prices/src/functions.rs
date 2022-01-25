@@ -4,7 +4,7 @@ impl<T: Config> Price<T> {
 	pub fn new(
 		object: Object, 
 		billing_scheme: BillingScheme,
-		created_by: T::Account,
+		created_by: T::AccountId,
 		currency: CurrencyId, 
 		livemode: bool,
 		product: ProductId, 

@@ -17,15 +17,21 @@ pub struct Price<Moment, BalanceOf, CurrencyId> {
 	pub created_at: Moment,
 	//	Must be supported Currency 
     pub currency: CurrencyId,
+	//	Has the value of true if the object exists in live modeor the value false if the object 
+	//	exists in test mode
     pub livemode: bool,
-    description: Vec<u8>,
+    // An arbitrary string attached to the object. Often useful for displauing to users
+	description: Vec<u8>,
+	//	Id of the product this price is associated with
     pub product: ProductId, 
 	//pub recurring: Option<Recurring>, 
     pub tiers_mode: Option<TiersMode<DepositBalance, Balance>>,
-    pub purchase_type: Type,
+    //	Type: One of OneTime or Recurring depending on whether the price is for a one-time purchase or a recurring purchase
+	pub purchase_type: Type,
 	// Represent how much to charge:
     #[codec(compact)]
 	pub unit_amount: Balance,
+	//	Amount in cents
     pub unit_amount_decimal: Option<Decimal>,
 }
 //  Represented as BlockNumbers
@@ -66,7 +72,7 @@ pub enum Type<Balance, BlockNumber> {
 	OneTime(Balance),
 	Recurring {
 		aggregated_usage: UsageTypes,
-        intevval: Interval,
+        interval: Interval,
 		interval_as_blocknumber: BlockNumber,
 		interval_count: u32,
 		usage_type: UsageTypes
