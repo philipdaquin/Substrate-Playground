@@ -85,7 +85,7 @@ pub mod pallet {
 		Option<PriceId>,
 		ValueQuery,
 	>;
-	//	
+	//	PriceId -> Price Struct
 	#[pallet::storage]
 	#[pallet::getter(fn price_to_id)]
 	pub type PriceList<T: Config> = StorageMap<
@@ -115,11 +115,20 @@ pub mod pallet {
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
 		PriceCreated { 
+			price_id: PriceId, 
+			object: Object, 
+			active: bool,
 			created_by: T::AccountId,
-			unit_amount: BalanceOf<T>, 
+			billing_scheme: BillingScheme,
+			created_at: Moment,
+			livemode: bool,
+			product_id: ProductId, 
+			tiers_mode: Option<TiersMode<DepositBalance, Balance>>,
 			currency: CurrencyId<T>,
 			purchase_type: Type,
-			product_id: ProductId, 
+			unit_amount: BalanceOf<T>, 
+			unit_amount_decimal: BalanceOf<T>,			
+			
 		},
 		PriceDeleted { 
 
@@ -148,6 +157,7 @@ pub mod pallet {
 		pub fn create_price(
 			origin: OriginFor<T>,
 			currency: CurrencyIdOf<T>,
+			active: bool,
 			livemode: bool,
 			product: ProductId,
 			description: Vec<u8>,
@@ -156,10 +166,16 @@ pub mod pallet {
 			unit_amount: Balance,
 			unit_amount_decimal: Option<Decimal>,
 		) -> DispatchResult { 
-			let sender = ensure_origin(origin);
+			let sender = T::Merchant::ensure_origin(origin);
+			//	Check if the product id is owned by the organisation
+			products::<T>::verify_product_owner(sender, product);
+
+			let price_id = Self::get_id();
 			let new_price = Price::<T>::new(
+				price_id,
 				object, 
 				billing_scheme, 
+				active, 
 				created_by, 
 				currency, 
 				livemode, 
@@ -170,8 +186,25 @@ pub mod pallet {
 				unit_amount, 
 				unit_amount_decimal
 			);
-			Self::deposit_event(PriceCreated {
+			OrganisationPrice::<T>::insert(sender, price_id);
+			PriceList::<T>::insert(price_id, new_price);
+			PricedFor::<T>::insert(price_id, product);
+			PriceIdOwner::<T>::insert(price_id, sender);
 
+			Self::deposit_event(PriceCreated {
+				price_id, 
+				object, 
+				active,
+				created_by,
+				billing_scheme,
+				created_at,
+				livemode,
+				product_id, 
+				tiers_mode,
+				currency,
+				purchase_type,
+				unit_amount, 
+				unit_amount_decimal,		
 			});
 
 			Ok(()) 

@@ -2,8 +2,10 @@ use super::*;
 
 impl<T: Config> Price<T> { 
 	pub fn new(
+		id: [u8; 16],
 		object: Object, 
 		billing_scheme: BillingScheme,
+		active: bool,
 		created_by: T::AccountId,
 		currency: CurrencyId, 
 		livemode: bool,
@@ -15,8 +17,9 @@ impl<T: Config> Price<T> {
 		unit_amount_decimal: Option<Decimal>,
 	) -> Self { 
 		Price { 
-			id: Self::get_id(),
+			id,
 			object, 
+			active: true,
 			created_by: Createdby::<T>::new(created_by.clone()),
 			billing_scheme,
 			created_at: Pallet::<T>::get_time(),
