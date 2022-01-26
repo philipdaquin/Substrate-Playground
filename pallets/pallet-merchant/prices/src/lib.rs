@@ -148,6 +148,8 @@ pub mod pallet {
 		StorageOverflow,
 	}
 
+
+	//	Need to be revised to the nature of enums of rust 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
 	// These functions materialize as "extrinsics", which are often compared to transactions.
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
@@ -169,6 +171,10 @@ pub mod pallet {
 			let sender = T::Merchant::ensure_origin(origin);
 			//	Check if the product id is owned by the organisation
 			products::<T>::verify_product_owner(sender, product);
+
+			if let 
+
+
 
 			let price_id = Self::get_id();
 			let new_price = Price::<T>::new(

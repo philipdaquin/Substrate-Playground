@@ -71,8 +71,8 @@ pub enum BillingScheme {
 	Per_unit,
 	Tiered
 }
-pub enum Type<Balance, BlockNumber> {
-	OneTime(Balance),
+pub enum Type<BalanceOf, BlockNumber> {
+	OneTime(BalanceOf<T>),
 	Recurring {
 		aggregated_usage: UsageTypes,
         interval: Interval,
